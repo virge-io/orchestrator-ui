@@ -5,6 +5,22 @@ set -euo pipefail
 # Configuration
 SUBMODULE_PATH="apps/wfo-ui"
 PACKAGE_PREFIX="@orchestrator-ui/orchestrator-ui-components@"
+WORKFLOWS_PATH=".github/workflows"
+BLOCK_DEPLOY_WORKFLOW="block-deploy-to-main.yml"
+TEMP_DIR=$(mktemp -d)
+
+cleanup() {
+  rm -rf "${TEMP_DIR}"
+}
+trap cleanup EXIT
+
+if [[ ! -f "${WORKFLOWS_PATH}/${BLOCK_DEPLOY_WORKFLOW}" ]]; then
+  echo "Error: Could not find ${WORKFLOWS_PATH}/${BLOCK_DEPLOY_WORKFLOW}" >&2
+  exit 1
+fi
+
+echo "==> Preserving ${WORKFLOWS_PATH}/${BLOCK_DEPLOY_WORKFLOW}"
+cp "${WORKFLOWS_PATH}/${BLOCK_DEPLOY_WORKFLOW}" "${TEMP_DIR}/${BLOCK_DEPLOY_WORKFLOW}"
 
 echo "==> Fetching latest tags"
 git fetch --tags
@@ -45,6 +61,10 @@ fi
 echo "==> Creating branch ${BRANCH}"
 git checkout -b "${BRANCH}"
 
+echo "==> Keeping only ${WORKFLOWS_PATH}/${BLOCK_DEPLOY_WORKFLOW}"
+rm -rf "${WORKFLOWS_PATH}"
+mkdir -p "${WORKFLOWS_PATH}"
+cp "${TEMP_DIR}/${BLOCK_DEPLOY_WORKFLOW}" "${WORKFLOWS_PATH}/${BLOCK_DEPLOY_WORKFLOW}"
 
 echo "==> Initializing and updating submodules"
 git submodule init
