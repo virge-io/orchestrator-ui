@@ -6,6 +6,7 @@
     "dev:storybook": "turbo run dev --filter=storybook...",
     "dev:all": "turbo run dev",
     "deploy": "node scripts/deploy.mjs",
+    "deploy:quick": "node scripts/deploy.mjs --quick",
     "test": "turbo run test",
     "tsc": "turbo run tsc",
     "lint": "turbo run lint",

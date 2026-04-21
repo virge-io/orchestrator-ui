@@ -96,6 +96,20 @@ The deploy script automates that translation from "published package tag in the 
 npm run deploy
 ```
 
+For the default happy path you can use quick mode, which skips the interactive prompts and takes the safe defaults:
+
+```bash
+npm run deploy:quick
+```
+
+You can also call the underlying flag directly with:
+
+```bash
+npm run deploy -- --quick
+```
+
+The deploy script also accepts `-q` as a shorthand alias for `--quick`.
+
 This command will:
 
 - let you select the version tag to deploy
@@ -108,6 +122,7 @@ This command will:
 - turn the `apps/wfo-ui` submodule into regular tracked files in the deploy branch so the branch is self-contained
 
 The deploy flow resets the selected output branch to the chosen tag before creating the deploy commit, so make sure the target branch can be overwritten.
+Quick mode uses the latest matching package tag, the preferred safe push remote, the suggested deploy branch name, and `no` for force-push. If no safe push remote exists yet, it will try to create a fork using the default fork and remote names.
 
 ## Frontend-Backend versioning dependency
 

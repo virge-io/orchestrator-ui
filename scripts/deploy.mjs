@@ -23,6 +23,32 @@ const repoDir = path.resolve(scriptDir, '..');
 
 process.chdir(repoDir);
 
+function parseCliArgs(args) {
+  const options = {
+    quick: false,
+  };
+
+  for (const arg of args) {
+    if (arg === '--quick' || arg === '-q') {
+      options.quick = true;
+      continue;
+    }
+
+    if (arg === '--help' || arg === '-h') {
+      console.log(`Usage: node scripts/deploy.mjs [--quick|-q]
+
+Options:
+  --quick, -q  Use the default deploy path without interactive prompts
+  --help, -h   Show this help message`);
+      process.exit(0);
+    }
+
+    throw new Error(`Unknown argument: ${arg}`);
+  }
+
+  return options;
+}
+
 function run(command, args, options = {}) {
   const { capture = false, allowFailure = false, cwd = repoDir } = options;
   const result = spawnSync(command, args, {
@@ -69,7 +95,11 @@ function isPromptExit(error) {
   return error && typeof error === 'object' && error.name === 'ExitPromptError';
 }
 
-function ensureInteractiveTerminal() {
+function ensureInteractiveTerminal(quickMode) {
+  if (quickMode) {
+    return;
+  }
+
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     throw new Error('This deploy command must be run in an interactive terminal.');
   }
@@ -185,11 +215,15 @@ function canCreateForkWithGh() {
   return hasGitHubCli() && hasGitHubAuth();
 }
 
-async function ensureCleanWorkingTree() {
+async function ensureCleanWorkingTree(quickMode) {
   const { stdout } = git(['status', '--porcelain'], { capture: true });
 
   if (!stdout) {
     return;
+  }
+
+  if (quickMode) {
+    throw new Error('Quick mode requires a clean working tree.');
   }
 
   const shouldContinue = await confirm({
@@ -287,11 +321,15 @@ async function validateForkRepoName(repoName) {
   return true;
 }
 
-async function promptForVersionTag(source) {
+async function promptForVersionTag(source, quickMode) {
   const tags = listVersionTags(source);
 
   if (tags.length === 0) {
     throw new Error(`No tags found matching ${PACKAGE_PREFIX}* in ${source}.`);
+  }
+
+  if (quickMode) {
+    return tags[0];
   }
 
   return select({
@@ -304,7 +342,11 @@ async function promptForVersionTag(source) {
   });
 }
 
-async function promptForTargetBranch(defaultBranch, pushRemoteName) {
+async function promptForTargetBranch(defaultBranch, pushRemoteName, quickMode) {
+  if (quickMode) {
+    return defaultBranch;
+  }
+
   const branchMode = await select({
     message: 'Choose the output branch',
     choices: [
@@ -351,34 +393,8 @@ async function promptForTargetBranch(defaultBranch, pushRemoteName) {
   });
 }
 
-async function createForkRemote(remotes) {
-  const forkRepoName = (
-    await input({
-      message: 'Enter the GitHub fork repository name',
-      default: DEFAULT_FORK_REPO_NAME,
-      validate: validateForkRepoName,
-    })
-  ).trim();
-
-  const forkRemoteName = (
-    await input({
-      message: 'Enter the local git remote name for the fork',
-      default: getSuggestedForkRemoteName(remotes),
-      validate: validateForkRemoteName,
-    })
-  ).trim();
-
-  logStep(`Creating fork ${forkRepoName} and configuring remote ${forkRemoteName}`);
-  gh(['repo', 'fork', OFFICIAL_REPO_SLUG, '--remote', '--remote-name', forkRemoteName, '--fork-name', forkRepoName]);
-
-  const forkRemote = getRemoteByName(forkRemoteName);
-
-  ensureSafePushRemote(forkRemote);
-  return forkRemote;
-}
-
-async function promptForPushRemote(remotes) {
-  const safePushRemotes = remotes
+function getSafePushRemotes(remotes) {
+  return remotes
     .filter(({ pushUrl, isOfficialRepo }) => pushUrl && !isOfficialRepo)
     .sort((left, right) => {
       const priority = (remoteName) => {
@@ -395,8 +411,52 @@ async function promptForPushRemote(remotes) {
 
       return priority(left.name) - priority(right.name) || left.name.localeCompare(right.name);
     });
+}
+
+async function createForkRemote(remotes, quickMode) {
+  const defaultForkRemoteName = getSuggestedForkRemoteName(remotes);
+  const forkRepoName =
+    quickMode ? DEFAULT_FORK_REPO_NAME : (
+      (
+        await input({
+          message: 'Enter the GitHub fork repository name',
+          default: DEFAULT_FORK_REPO_NAME,
+          validate: validateForkRepoName,
+        })
+      ).trim()
+    );
+
+  const forkRemoteName =
+    quickMode ? defaultForkRemoteName : (
+      (
+        await input({
+          message: 'Enter the local git remote name for the fork',
+          default: defaultForkRemoteName,
+          validate: validateForkRemoteName,
+        })
+      ).trim()
+    );
+
+  logStep(`Creating fork ${forkRepoName} and configuring remote ${forkRemoteName}`);
+  gh(['repo', 'fork', OFFICIAL_REPO_SLUG, '--remote', '--remote-name', forkRemoteName, '--fork-name', forkRepoName]);
+
+  const forkRemote = getRemoteByName(forkRemoteName);
+
+  ensureSafePushRemote(forkRemote);
+  return forkRemote;
+}
+
+async function promptForPushRemote(remotes, quickMode) {
+  const safePushRemotes = getSafePushRemotes(remotes);
 
   if (safePushRemotes.length > 0) {
+    if (quickMode) {
+      const pushRemote = safePushRemotes[0];
+
+      ensureSafePushRemote(pushRemote);
+      return pushRemote;
+    }
+
     const remoteName = await select({
       message: 'Select the push remote',
       pageSize: 10,
@@ -418,6 +478,10 @@ async function promptForPushRemote(remotes) {
     );
   }
 
+  if (quickMode) {
+    return createForkRemote(remotes, true);
+  }
+
   const action = await select({
     message: 'No safe push remote is configured',
     choices: [
@@ -436,7 +500,7 @@ async function promptForPushRemote(remotes) {
     throw new Error('Aborting because no safe push remote is configured.');
   }
 
-  return createForkRemote(remotes);
+  return createForkRemote(remotes, false);
 }
 
 function snapshotSubmodule(tempDir) {
@@ -520,7 +584,7 @@ function getSuggestedCopilotRuntimeVersion(appPackage) {
   );
 }
 
-async function maybeAddCopilotRuntime() {
+async function maybeAddCopilotRuntime(quickMode) {
   const appPackageJsonPath = getSubmodulePackageJsonPath();
 
   if (!existsSync(appPackageJsonPath)) {
@@ -536,14 +600,22 @@ async function maybeAddCopilotRuntime() {
   }
 
   const suggestedVersion = getSuggestedCopilotRuntimeVersion(appPackage);
+  const defaultAddRuntime = Boolean(suggestedVersion);
 
-  const shouldAddRuntime = await confirm({
-    message:
-      suggestedVersion ?
-        `Add @copilotkit/runtime@${suggestedVersion} to ${SUBMODULE_PATH}?`
-      : `Add @copilotkit/runtime to ${SUBMODULE_PATH}?`,
-    default: false,
-  });
+  if (quickMode && !defaultAddRuntime) {
+    return;
+  }
+
+  const shouldAddRuntime =
+    quickMode ? true : (
+      await confirm({
+        message:
+          suggestedVersion ?
+            `Add @copilotkit/runtime@${suggestedVersion} to ${SUBMODULE_PATH}?`
+          : `Add @copilotkit/runtime to ${SUBMODULE_PATH}?`,
+        default: defaultAddRuntime,
+      })
+    );
 
   if (!shouldAddRuntime) {
     return;
@@ -611,26 +683,30 @@ function pushBranch(pushRemoteName, branch, forcePush) {
 
 async function main() {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), 'orchestrator-ui-deploy-'));
+  const cliOptions = parseCliArgs(process.argv.slice(2));
 
   try {
-    ensureInteractiveTerminal();
-    await ensureCleanWorkingTree();
+    ensureInteractiveTerminal(cliOptions.quick);
+    await ensureCleanWorkingTree(cliOptions.quick);
 
     const remotes = listRemotes();
-    const pushRemote = await promptForPushRemote(remotes);
+    const pushRemote = await promptForPushRemote(remotes, cliOptions.quick);
     const officialTagSource = getOfficialTagSource(remotes);
-    const versionTag = await promptForVersionTag(officialTagSource);
+    const versionTag = await promptForVersionTag(officialTagSource, cliOptions.quick);
     const version = versionTag.slice(PACKAGE_PREFIX.length);
     const defaultBranch = `deploy-${version}`;
 
     logStep(`Fetching branches from ${pushRemote.name}`);
     git(['fetch', pushRemote.name, '--prune']);
 
-    const branch = await promptForTargetBranch(defaultBranch, pushRemote.name);
-    const forcePush = await confirm({
-      message: `Force push to ${pushRemote.name}?`,
-      default: false,
-    });
+    const branch = await promptForTargetBranch(defaultBranch, pushRemote.name, cliOptions.quick);
+    const forcePush =
+      cliOptions.quick ? false : (
+        await confirm({
+          message: `Force push to ${pushRemote.name}?`,
+          default: false,
+        })
+      );
 
     console.log(`\nSelected tag: ${versionTag}`);
     console.log(`Push remote: ${pushRemote.name}`);
@@ -668,7 +744,7 @@ async function main() {
     logStep('Restoring submodule content as regular files');
     restoreSubmoduleContent(snapshotPath);
 
-    await maybeAddCopilotRuntime();
+    await maybeAddCopilotRuntime(cliOptions.quick);
 
     logStep('Cleaning up submodule config');
     cleanupSubmoduleConfig();
