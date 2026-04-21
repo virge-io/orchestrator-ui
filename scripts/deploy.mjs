@@ -11,6 +11,10 @@ import { confirm, input, select } from '@inquirer/prompts';
 
 const SUBMODULE_PATH = 'apps/wfo-ui';
 const PACKAGE_PREFIX = '@orchestrator-ui/orchestrator-ui-components@';
+const OFFICIAL_REPO_SLUG = 'workfloworchestrator/orchestrator-ui-library';
+const OFFICIAL_REPO_URL = `https://github.com/${OFFICIAL_REPO_SLUG}.git`;
+const DEFAULT_FORK_REPO_NAME = 'orchestrator-ui-library';
+const DEFAULT_FORK_REMOTE_NAME = 'fork';
 const COMMIT_MESSAGE = (version) =>
   `Deploy version ${version}: remove submodule ${SUBMODULE_PATH} and add its content directly`;
 
@@ -53,6 +57,10 @@ function git(args, options) {
   return run('git', args, options);
 }
 
+function gh(args, options) {
+  return run('gh', args, options);
+}
+
 function logStep(message) {
   console.log(`\n==> ${message}`);
 }
@@ -65,6 +73,116 @@ function ensureInteractiveTerminal() {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     throw new Error('This deploy command must be run in an interactive terminal.');
   }
+}
+
+function normalizeGitHubRepo(url) {
+  if (!url) {
+    return null;
+  }
+
+  const trimmedUrl = url.trim();
+  const scpLikeMatch = trimmedUrl.match(/^(?:[^@]+@)?github\.com:(.+)$/i);
+
+  if (scpLikeMatch) {
+    return scpLikeMatch[1]
+      .replace(/\/$/, '')
+      .replace(/\.git$/i, '')
+      .toLowerCase();
+  }
+
+  try {
+    const parsedUrl = new URL(trimmedUrl);
+    const hostname = parsedUrl.hostname.toLowerCase();
+
+    if (hostname !== 'github.com' && hostname !== 'www.github.com') {
+      return null;
+    }
+
+    return parsedUrl.pathname
+      .replace(/^\/+/, '')
+      .replace(/\/$/, '')
+      .replace(/\.git$/i, '')
+      .toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function listRemotes() {
+  const { stdout } = git(['remote'], { capture: true });
+  const remoteNames = stdout ? stdout.split('\n').filter(Boolean) : [];
+
+  return remoteNames
+    .map((name) => {
+      const fetchUrl = git(['remote', 'get-url', name], { capture: true, allowFailure: true }).stdout;
+      const pushUrl = git(['remote', 'get-url', '--push', name], { capture: true, allowFailure: true }).stdout;
+      const repoSlug = normalizeGitHubRepo(pushUrl) ?? normalizeGitHubRepo(fetchUrl);
+
+      return {
+        name,
+        fetchUrl,
+        pushUrl,
+        repoSlug,
+        isOfficialRepo: repoSlug === OFFICIAL_REPO_SLUG,
+      };
+    })
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function getRemoteByName(remoteName) {
+  const remote = listRemotes().find(({ name }) => name === remoteName);
+
+  if (!remote) {
+    throw new Error(`Could not find git remote ${remoteName}.`);
+  }
+
+  return remote;
+}
+
+function ensureSafePushRemote(remote) {
+  if (!remote.pushUrl) {
+    throw new Error(`Remote ${remote.name} does not have a push URL configured.`);
+  }
+
+  if (remote.isOfficialRepo) {
+    throw new Error(`Refusing to push to official repository remote ${remote.name} (${remote.pushUrl}).`);
+  }
+}
+
+function describeRemote(remote) {
+  return `${remote.name} (${remote.pushUrl || remote.fetchUrl})`;
+}
+
+function getOfficialTagSource(remotes) {
+  return remotes.find(({ isOfficialRepo }) => isOfficialRepo)?.name ?? OFFICIAL_REPO_URL;
+}
+
+function getSuggestedForkRemoteName(remotes) {
+  const existingRemoteNames = new Set(remotes.map(({ name }) => name));
+
+  if (!existingRemoteNames.has(DEFAULT_FORK_REMOTE_NAME)) {
+    return DEFAULT_FORK_REMOTE_NAME;
+  }
+
+  let index = 2;
+
+  while (existingRemoteNames.has(`${DEFAULT_FORK_REMOTE_NAME}-${index}`)) {
+    index += 1;
+  }
+
+  return `${DEFAULT_FORK_REMOTE_NAME}-${index}`;
+}
+
+function hasGitHubCli() {
+  return gh(['--version'], { capture: true, allowFailure: true }).status === 0;
+}
+
+function hasGitHubAuth() {
+  return gh(['auth', 'status'], { capture: true, allowFailure: true }).status === 0;
+}
+
+function canCreateForkWithGh() {
+  return hasGitHubCli() && hasGitHubAuth();
 }
 
 async function ensureCleanWorkingTree() {
@@ -84,25 +202,40 @@ async function ensureCleanWorkingTree() {
   }
 }
 
-function listVersionTags() {
-  const { stdout } = git(['tag', '--list', `${PACKAGE_PREFIX}*`, '--sort=-v:refname'], { capture: true });
+function listVersionTags(source) {
+  const { stdout } = git(['ls-remote', '--tags', '--refs', source], { capture: true });
 
-  return stdout ? stdout.split('\n').filter(Boolean) : [];
+  return stdout
+    .split('\n')
+    .map((line) => line.split('\t')[1])
+    .filter(Boolean)
+    .map((ref) => ref.replace(/^refs\/tags\//, ''))
+    .filter((tag) => tag.startsWith(PACKAGE_PREFIX))
+    .sort((left, right) =>
+      right.slice(PACKAGE_PREFIX.length).localeCompare(left.slice(PACKAGE_PREFIX.length), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      }),
+    );
 }
 
-function listBranchNames() {
-  const { stdout } = git(['for-each-ref', '--format=%(refname:short)', 'refs/heads', 'refs/remotes/origin'], {
-    capture: true,
-  });
+function listBranchNames(pushRemoteName) {
+  const { stdout } = git(
+    ['for-each-ref', '--format=%(refname:short)', 'refs/heads', `refs/remotes/${pushRemoteName}`],
+    {
+      capture: true,
+    },
+  );
 
   const names = new Set();
+  const remotePrefix = `${pushRemoteName}/`;
 
   for (const rawBranch of stdout.split('\n')) {
-    if (!rawBranch || rawBranch === 'origin/HEAD') {
+    if (!rawBranch || rawBranch.endsWith('/HEAD')) {
       continue;
     }
 
-    const branch = rawBranch.startsWith('origin/') ? rawBranch.slice('origin/'.length) : rawBranch;
+    const branch = rawBranch.startsWith(remotePrefix) ? rawBranch.slice(remotePrefix.length) : rawBranch;
 
     if (branch) {
       names.add(branch);
@@ -126,11 +259,39 @@ async function validateBranchName(branch) {
   return true;
 }
 
-async function promptForVersionTag() {
-  const tags = listVersionTags();
+async function validateForkRemoteName(remoteName) {
+  if (!remoteName.trim()) {
+    return 'Remote name is required.';
+  }
+
+  if (/\s/.test(remoteName)) {
+    return 'Remote name cannot contain whitespace.';
+  }
+
+  if (listRemotes().some(({ name }) => name === remoteName)) {
+    return 'Choose a different remote name.';
+  }
+
+  return true;
+}
+
+async function validateForkRepoName(repoName) {
+  if (!repoName.trim()) {
+    return 'Fork repository name is required.';
+  }
+
+  if (repoName.includes('/')) {
+    return 'Enter only the repository name, not owner/repository.';
+  }
+
+  return true;
+}
+
+async function promptForVersionTag(source) {
+  const tags = listVersionTags(source);
 
   if (tags.length === 0) {
-    throw new Error(`No tags found matching ${PACKAGE_PREFIX}*`);
+    throw new Error(`No tags found matching ${PACKAGE_PREFIX}* in ${source}.`);
   }
 
   return select({
@@ -143,7 +304,7 @@ async function promptForVersionTag() {
   });
 }
 
-async function promptForTargetBranch(defaultBranch) {
+async function promptForTargetBranch(defaultBranch, pushRemoteName) {
   const branchMode = await select({
     message: 'Choose the output branch',
     choices: [
@@ -167,10 +328,10 @@ async function promptForTargetBranch(defaultBranch) {
   }
 
   if (branchMode === 'existing') {
-    const branches = listBranchNames();
+    const branches = listBranchNames(pushRemoteName);
 
     if (branches.length === 0) {
-      throw new Error('No local or origin branches are available to choose from.');
+      throw new Error(`No local or ${pushRemoteName} branches are available to choose from.`);
     }
 
     return select({
@@ -188,6 +349,94 @@ async function promptForTargetBranch(defaultBranch) {
     default: defaultBranch,
     validate: validateBranchName,
   });
+}
+
+async function createForkRemote(remotes) {
+  const forkRepoName = (
+    await input({
+      message: 'Enter the GitHub fork repository name',
+      default: DEFAULT_FORK_REPO_NAME,
+      validate: validateForkRepoName,
+    })
+  ).trim();
+
+  const forkRemoteName = (
+    await input({
+      message: 'Enter the local git remote name for the fork',
+      default: getSuggestedForkRemoteName(remotes),
+      validate: validateForkRemoteName,
+    })
+  ).trim();
+
+  logStep(`Creating fork ${forkRepoName} and configuring remote ${forkRemoteName}`);
+  gh(['repo', 'fork', OFFICIAL_REPO_SLUG, '--remote', '--remote-name', forkRemoteName, '--fork-name', forkRepoName]);
+
+  const forkRemote = getRemoteByName(forkRemoteName);
+
+  ensureSafePushRemote(forkRemote);
+  return forkRemote;
+}
+
+async function promptForPushRemote(remotes) {
+  const safePushRemotes = remotes
+    .filter(({ pushUrl, isOfficialRepo }) => pushUrl && !isOfficialRepo)
+    .sort((left, right) => {
+      const priority = (remoteName) => {
+        if (remoteName === 'origin') {
+          return 0;
+        }
+
+        if (remoteName === DEFAULT_FORK_REMOTE_NAME) {
+          return 1;
+        }
+
+        return 2;
+      };
+
+      return priority(left.name) - priority(right.name) || left.name.localeCompare(right.name);
+    });
+
+  if (safePushRemotes.length > 0) {
+    const remoteName = await select({
+      message: 'Select the push remote',
+      pageSize: 10,
+      choices: safePushRemotes.map((remote) => ({
+        name: describeRemote(remote),
+        value: remote.name,
+      })),
+    });
+
+    const pushRemote = safePushRemotes.find(({ name }) => name === remoteName);
+
+    ensureSafePushRemote(pushRemote);
+    return pushRemote;
+  }
+
+  if (!canCreateForkWithGh()) {
+    throw new Error(
+      `No safe push remote is configured. Add a fork remote for ${OFFICIAL_REPO_SLUG} and retry. The script refuses to push to the official repository.`,
+    );
+  }
+
+  const action = await select({
+    message: 'No safe push remote is configured',
+    choices: [
+      {
+        name: 'Create a fork and configure a push remote',
+        value: 'create-fork',
+      },
+      {
+        name: 'Abort',
+        value: 'abort',
+      },
+    ],
+  });
+
+  if (action === 'abort') {
+    throw new Error('Aborting because no safe push remote is configured.');
+  }
+
+  return createForkRemote(remotes);
 }
 
 function snapshotSubmodule(tempDir) {
@@ -341,14 +590,22 @@ function prepareSubmoduleForInit() {
   rmSync(modulesPath, { recursive: true, force: true });
 }
 
-function pushBranch(branch, forcePush) {
+function fetchVersionTag(source, versionTag) {
+  git(['fetch', source, '--force', `refs/tags/${versionTag}:refs/tags/${versionTag}`]);
+}
+
+function pushBranch(pushRemoteName, branch, forcePush) {
+  const pushRemote = getRemoteByName(pushRemoteName);
+
+  ensureSafePushRemote(pushRemote);
+
   const args = ['push'];
 
   if (forcePush) {
     args.push('--force-with-lease');
   }
 
-  args.push('--set-upstream', 'origin', branch);
+  args.push('--set-upstream', pushRemoteName, branch);
   git(args);
 }
 
@@ -359,21 +616,29 @@ async function main() {
     ensureInteractiveTerminal();
     await ensureCleanWorkingTree();
 
-    logStep('Fetching tags and branches from origin');
-    git(['fetch', 'origin', '--tags', '--prune']);
-
-    const versionTag = await promptForVersionTag();
+    const remotes = listRemotes();
+    const pushRemote = await promptForPushRemote(remotes);
+    const officialTagSource = getOfficialTagSource(remotes);
+    const versionTag = await promptForVersionTag(officialTagSource);
     const version = versionTag.slice(PACKAGE_PREFIX.length);
     const defaultBranch = `deploy-${version}`;
-    const branch = await promptForTargetBranch(defaultBranch);
+
+    logStep(`Fetching branches from ${pushRemote.name}`);
+    git(['fetch', pushRemote.name, '--prune']);
+
+    const branch = await promptForTargetBranch(defaultBranch, pushRemote.name);
     const forcePush = await confirm({
-      message: 'Force push to origin?',
+      message: `Force push to ${pushRemote.name}?`,
       default: false,
     });
 
     console.log(`\nSelected tag: ${versionTag}`);
+    console.log(`Push remote: ${pushRemote.name}`);
     console.log(`Target branch: ${branch}`);
     console.log(`Force push: ${forcePush ? 'yes' : 'no'}`);
+
+    logStep(`Fetching package tag ${versionTag} from ${officialTagSource}`);
+    fetchVersionTag(officialTagSource, versionTag);
 
     logStep(`Checking out package tag ${versionTag}`);
     git(['switch', '--detach', versionTag]);
@@ -414,8 +679,8 @@ async function main() {
     logStep('Committing changes');
     git(['commit', '-m', COMMIT_MESSAGE(version), '--no-verify']);
 
-    logStep(`Pushing branch ${branch}`);
-    pushBranch(branch, forcePush);
+    logStep(`Pushing branch ${branch} to ${pushRemote.name}`);
+    pushBranch(pushRemote.name, branch, forcePush);
 
     console.log(`\n==> Done. Deployed version ${version} on branch ${branch}`);
   } finally {

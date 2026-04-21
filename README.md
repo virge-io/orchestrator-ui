@@ -95,8 +95,11 @@ npm run deploy
 This command will:
 
 - let you select the version tag to deploy
+- fetch deploy tags from the official `workfloworchestrator/orchestrator-ui-library` repository
+- let you choose a safe push remote and refuse pushes to the official repository
+- offer to create a fork with GitHub CLI when no safe push remote is configured, including custom names for the fork repository and local remote
 - let you use the suggested deploy branch, select an existing branch, or enter a new branch name
-- ask whether the push to origin should use `--force-with-lease` (default is `no`)
+- ask whether the push should use `--force-with-lease` (default is `no`)
 - ask whether `@copilotkit/runtime` should be added to `apps/wfo-ui` when the selected tag does not already include it
 
 The deploy flow resets the selected output branch to the chosen tag before creating the deploy commit, so make sure the target branch can be overwritten.
