@@ -236,6 +236,24 @@ async function ensureCleanWorkingTree(quickMode) {
   }
 }
 
+function compareVersions(a, b) {
+  const [aCoreStr, aPreStr] = a.split(/-(.+)/);
+  const [bCoreStr, bPreStr] = b.split(/-(.+)/);
+  const aParts = aCoreStr.split('.').map(Number);
+  const bParts = bCoreStr.split('.').map(Number);
+
+  for (let i = 0; i < 3; i++) {
+    const diff = (aParts[i] ?? 0) - (bParts[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+
+  if (aPreStr && !bPreStr) return -1;
+  if (!aPreStr && bPreStr) return 1;
+  if (aPreStr && bPreStr) return aPreStr.localeCompare(bPreStr, undefined, { numeric: true });
+
+  return 0;
+}
+
 function listVersionTags(source) {
   const { stdout } = git(['ls-remote', '--tags', '--refs', source], { capture: true });
 
@@ -246,10 +264,7 @@ function listVersionTags(source) {
     .map((ref) => ref.replace(/^refs\/tags\//, ''))
     .filter((tag) => tag.startsWith(PACKAGE_PREFIX))
     .sort((left, right) =>
-      right.slice(PACKAGE_PREFIX.length).localeCompare(left.slice(PACKAGE_PREFIX.length), undefined, {
-        numeric: true,
-        sensitivity: 'base',
-      }),
+      compareVersions(right.slice(PACKAGE_PREFIX.length), left.slice(PACKAGE_PREFIX.length)),
     );
 }
 
@@ -684,6 +699,7 @@ function pushBranch(pushRemoteName, branch, forcePush) {
 async function main() {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), 'orchestrator-ui-deploy-'));
   const cliOptions = parseCliArgs(process.argv.slice(2));
+  let originalRef = null;
 
   try {
     ensureInteractiveTerminal(cliOptions.quick);
@@ -716,6 +732,9 @@ async function main() {
     logStep(`Fetching package tag ${versionTag} from ${officialTagSource}`);
     fetchVersionTag(officialTagSource, versionTag);
 
+    const symRef = git(['symbolic-ref', '--short', 'HEAD'], { capture: true, allowFailure: true });
+    originalRef = symRef.status === 0 ? symRef.stdout : git(['rev-parse', 'HEAD'], { capture: true }).stdout;
+
     logStep(`Checking out package tag ${versionTag}`);
     git(['switch', '--detach', versionTag]);
 
@@ -726,7 +745,7 @@ async function main() {
     prepareSubmoduleForInit();
 
     logStep('Initializing and updating submodules');
-    git(['submodule', 'update', '--init', '--remote']);
+    git(['submodule', 'update', '--init']);
 
     const submodulePath = path.join(repoDir, SUBMODULE_PATH);
 
@@ -753,12 +772,19 @@ async function main() {
     git(['add', '-A']);
 
     logStep('Committing changes');
+    // --no-verify: deploy commits are generated content, not subject to lint/test hooks
     git(['commit', '-m', COMMIT_MESSAGE(version), '--no-verify']);
 
     logStep(`Pushing branch ${branch} to ${pushRemote.name}`);
     pushBranch(pushRemote.name, branch, forcePush);
 
     console.log(`\n==> Done. Deployed version ${version} on branch ${branch}`);
+  } catch (error) {
+    if (originalRef) {
+      console.error(`\nAttempting to restore HEAD to ${originalRef}...`);
+      git(['switch', originalRef], { allowFailure: true });
+    }
+    throw error;
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
