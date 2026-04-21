@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -20,9 +20,9 @@ const repoDir = path.resolve(scriptDir, '..');
 process.chdir(repoDir);
 
 function run(command, args, options = {}) {
-  const { capture = false, allowFailure = false } = options;
+  const { capture = false, allowFailure = false, cwd = repoDir } = options;
   const result = spawnSync(command, args, {
-    cwd: repoDir,
+    cwd,
     encoding: 'utf8',
     stdio: capture ? ['inherit', 'pipe', 'pipe'] : 'inherit',
   });
@@ -251,6 +251,74 @@ function restoreSubmoduleContent(snapshotPath) {
   stripGitMetadata(submodulePath);
 }
 
+function readJsonFile(filePath) {
+  return JSON.parse(readFileSync(filePath, 'utf8'));
+}
+
+function getSubmodulePackageJsonPath() {
+  return path.join(repoDir, SUBMODULE_PATH, 'package.json');
+}
+
+function getSuggestedCopilotRuntimeVersion(appPackage) {
+  const dependencies = appPackage.dependencies ?? {};
+
+  return (
+    dependencies['@copilotkit/runtime']
+    ?? dependencies['@copilotkit/react-core']
+    ?? dependencies['@copilotkit/react-ui']
+    ?? dependencies['@copilotkit/react-textarea']
+    ?? null
+  );
+}
+
+async function maybeAddCopilotRuntime() {
+  const appPackageJsonPath = getSubmodulePackageJsonPath();
+
+  if (!existsSync(appPackageJsonPath)) {
+    return;
+  }
+
+  const appPackage = readJsonFile(appPackageJsonPath);
+  const existingVersion = appPackage.dependencies?.['@copilotkit/runtime'];
+
+  if (existingVersion) {
+    console.log(`==> ${SUBMODULE_PATH} already depends on @copilotkit/runtime@${existingVersion}`);
+    return;
+  }
+
+  const suggestedVersion = getSuggestedCopilotRuntimeVersion(appPackage);
+
+  const shouldAddRuntime = await confirm({
+    message:
+      suggestedVersion ?
+        `Add @copilotkit/runtime@${suggestedVersion} to ${SUBMODULE_PATH}?`
+      : `Add @copilotkit/runtime to ${SUBMODULE_PATH}?`,
+    default: false,
+  });
+
+  if (!shouldAddRuntime) {
+    return;
+  }
+
+  const runtimeVersion =
+    suggestedVersion
+    ?? (
+      await input({
+        message: 'Enter the @copilotkit/runtime version to install',
+        validate: (value) => (value.trim() ? true : 'Version is required.'),
+      })
+    ).trim();
+
+  logStep(`Adding @copilotkit/runtime@${runtimeVersion} to ${SUBMODULE_PATH}`);
+  run(
+    'npm',
+    ['install', '--package-lock-only', '--ignore-scripts', '--save-exact', `@copilotkit/runtime@${runtimeVersion}`],
+    {
+      cwd: path.join(repoDir, SUBMODULE_PATH),
+    },
+  );
+}
+
 function cleanupSubmoduleConfig() {
   const gitDir = git(['rev-parse', '--git-dir'], { capture: true }).stdout;
   const modulesPath = path.resolve(repoDir, gitDir, 'modules', SUBMODULE_PATH);
@@ -334,6 +402,8 @@ async function main() {
 
     logStep('Restoring submodule content as regular files');
     restoreSubmoduleContent(snapshotPath);
+
+    await maybeAddCopilotRuntime();
 
     logStep('Cleaning up submodule config');
     cleanupSubmoduleConfig();

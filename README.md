@@ -84,6 +84,29 @@ Once the pull-request with a changeset file is merged to the main branch another
 
 Just merge the `Version Packages` PR into main, and the packages will be published to npm automatically.
 
+## Create a deploy branch
+
+Use the interactive deploy script when you want to create or update a deploy branch from a published `@orchestrator-ui/orchestrator-ui-components` tag.
+
+```bash
+npm run deploy
+```
+
+This command will:
+
+- let you select the version tag to deploy
+- let you use the suggested deploy branch, select an existing branch, or enter a new branch name
+- ask whether the push to origin should use `--force-with-lease` (default is `no`)
+- ask whether `@copilotkit/runtime` should be added to `apps/wfo-ui` when the selected tag does not already include it
+
+The deploy flow resets the selected output branch to the chosen tag before creating the deploy commit, so make sure the target branch can be overwritten.
+
+You can also run the wrapper script directly:
+
+```bash
+./deploy.bash
+```
+
 ## Frontend-Backend versioning dependency
 
 The file `version-compatibility.json` in the root of the orchestrator-ui-library is used to define the minimum backend version that is required for a specific frontend version.
