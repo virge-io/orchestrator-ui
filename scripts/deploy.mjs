@@ -263,6 +263,16 @@ function cleanupSubmoduleConfig() {
   }
 }
 
+function prepareSubmoduleForInit() {
+  const gitDir = git(['rev-parse', '--git-dir'], { capture: true }).stdout;
+  const submodulePath = path.join(repoDir, SUBMODULE_PATH);
+  const modulesPath = path.resolve(repoDir, gitDir, 'modules', SUBMODULE_PATH);
+
+  git(['submodule', 'deinit', '-f', '--', SUBMODULE_PATH], { allowFailure: true });
+  rmSync(submodulePath, { recursive: true, force: true });
+  rmSync(modulesPath, { recursive: true, force: true });
+}
+
 function pushBranch(branch, forcePush) {
   const args = ['push'];
 
@@ -302,6 +312,9 @@ async function main() {
 
     logStep(`Creating or resetting branch ${branch}`);
     git(['switch', '-C', branch]);
+
+    logStep(`Preparing ${SUBMODULE_PATH} for submodule checkout`);
+    prepareSubmoduleForInit();
 
     logStep('Initializing and updating submodules');
     git(['submodule', 'update', '--init', '--remote']);
