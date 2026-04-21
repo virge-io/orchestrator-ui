@@ -88,6 +88,10 @@ Just merge the `Version Packages` PR into main, and the packages will be publish
 
 Use the interactive deploy script when you want to create or update a deploy branch from a published `@orchestrator-ui/orchestrator-ui-components` tag.
 
+This is useful because this repository is not a single deployable app. It is a monorepo that publishes reusable UI packages, while the example `apps/wfo-ui` application lives as a submodule during normal development. For deployment you usually want a branch that is tied to one published package version and that contains the example app as regular files, so the result can be pushed, reviewed, and deployed as one coherent snapshot.
+
+The deploy script automates that translation from "published package tag in the monorepo" to "deployable application branch". Without it you would need to manually check out the correct package tag, update the submodule, convert the submodule content into tracked files, fix any tag-specific dependency gaps, and make sure you are pushing only to a fork instead of the official repository.
+
 ```bash
 npm run deploy
 ```
@@ -101,14 +105,9 @@ This command will:
 - let you use the suggested deploy branch, select an existing branch, or enter a new branch name
 - ask whether the push should use `--force-with-lease` (default is `no`)
 - ask whether `@copilotkit/runtime` should be added to `apps/wfo-ui` when the selected tag does not already include it
+- turn the `apps/wfo-ui` submodule into regular tracked files in the deploy branch so the branch is self-contained
 
 The deploy flow resets the selected output branch to the chosen tag before creating the deploy commit, so make sure the target branch can be overwritten.
-
-You can also run the wrapper script directly:
-
-```bash
-./deploy.bash
-```
 
 ## Frontend-Backend versioning dependency
 
