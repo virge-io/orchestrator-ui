@@ -110,9 +110,13 @@ npx storybook dev
 
 Story book can be inspected on [http://localhost:61834/](http://localhost:61834/).
 
-## Create a deploy branch
+## Deploy script
 
-Vercel and similar hosts don't play well with monorepos, so use the deploy script to produce a self-contained branch from a published `@orchestrator-ui/orchestrator-ui-components` tag the submodule gets materialized as regular tracked files and everything is pushed in one shot.
+Use this script when you want to deploy your fork to a hosting provider (e.g. Vercel) that doesn't support git submodules.
+
+Vercel and similar hosts don't play well with submodules, so the deploy script produces a "deploy" branch from a published `@orchestrator-ui/orchestrator-ui-components` tag: the submodule is materialized as regular tracked files and everything is pushed in one shot. This makes it easy to stay in sync with upstream while still being able to apply local changes.
+
+Run this script from your fork of the official repo. The script refuses to push to the official repo, so you must have your own fork (it can create one via GitHub CLI if needed).
 
 ```bash
 npm run deploy        # interactive
