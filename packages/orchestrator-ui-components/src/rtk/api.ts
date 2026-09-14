@@ -22,6 +22,7 @@ export enum HttpStatus {
   FormNotComplete = 510,
   BadGateway = 502,
   BadRequest = 400,
+  PreconditionFailed = 412,
   ServiceUnavailable = 503,
   Unauthorized = 401,
   Forbidden = 403,
@@ -165,6 +166,7 @@ export const orchestratorApi = createApi({
     CacheTagType.processStatusCounts,
     CacheTagType.subscriptions,
     CacheTagType.scheduledTasks,
+    CacheTagType.metadataProducts,
   ],
   keepUnusedDataFor: process.env.NEXT_PUBLIC_DISABLE_CACHE === 'true' ? 0 : 60 * 60 * 1000,
 });

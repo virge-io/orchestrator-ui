@@ -8,6 +8,7 @@ import {
   FilterQuery,
   PATH_WORKFLOWS,
   WfoDateTime,
+  WfoProcessListNoteEdit,
   WfoProcessStatusBadge,
   WfoWorkflowTargetBadge,
   getPageIndexChangeHandler,
@@ -35,6 +36,7 @@ import { parseDateToLocaleDateTimeString } from '@/utils';
 import { getQueryVariablesForExport } from '@/utils';
 import { csvDownloadHandler, getCsvFileNameWithDate } from '@/utils/csvDownload';
 
+import { WfoProcessListDeltaPopover } from './WfoProcessListDeltaPopover';
 import {
   graphQlProcessFilterMapper,
   graphQlProcessSortMapper,
@@ -53,6 +55,7 @@ export type ProcessListItem = Pick<
   | 'assignee'
   | 'processId'
   | 'subscriptions'
+  | 'note'
 > & {
   startedAt: Date;
   lastModifiedAt: Date;
@@ -94,6 +97,11 @@ export const WfoProcessesList = ({
   const router = useRouter();
 
   const defaultTableColumns: WfoAdvancedTableColumnConfig<ProcessListItem> = {
+    delta: {
+      columnType: ColumnType.CONTROL,
+      width: '50px',
+      renderControl: (row) => <WfoProcessListDeltaPopover processListItem={row} />,
+    },
     workflowName: {
       columnType: ColumnType.DATA,
       label: t('workflowName'),
@@ -137,6 +145,12 @@ export const WfoProcessesList = ({
       columnType: ColumnType.DATA,
       label: t('customerAbbreviation'),
       width: '125px',
+    },
+    note: {
+      columnType: ColumnType.DATA,
+      label: t('note'),
+      width: '250px',
+      renderData: (note, { processId }) => <WfoProcessListNoteEdit processId={processId} note={note} />,
     },
     subscriptions: {
       columnType: ColumnType.DATA,
@@ -227,15 +241,17 @@ export const WfoProcessesList = ({
   const getProcessListForExport = () =>
     getProcessListTrigger(getQueryVariablesForExport(processListQueryVars)).unwrap();
 
+  const tableConfig = mapSortableAndFilterableValuesToTableColumnConfig(
+    tableColumns,
+    pageInfo?.sortFields,
+    pageInfo?.filterFields,
+  );
+
   return (
     <WfoAdvancedTable<ProcessListItem>
       queryString={queryString}
       data={mapGraphQlProcessListResultToProcessListItems(processes || [])}
-      tableColumnConfig={mapSortableAndFilterableValuesToTableColumnConfig(
-        tableColumns,
-        pageInfo?.sortFields,
-        pageInfo?.filterFields,
-      )}
+      tableColumnConfig={tableConfig}
       dataSorting={[dataSorting]}
       pagination={pagination}
       isLoading={isFetching}

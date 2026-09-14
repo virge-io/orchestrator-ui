@@ -21,11 +21,14 @@ import { Header } from '@/components/WfoPydanticForm/Header';
 import { Row } from '@/components/WfoPydanticForm/Row';
 import {
   WfoArrayField,
+  WfoCallout,
   WfoCheckbox,
+  WfoCron,
   WfoDivider,
   WfoDropdown,
   WfoInteger,
   WfoLabel,
+  WfoMarkdownField,
   WfoMultiCheckboxField,
   WfoObjectField,
   WfoRadio,
@@ -34,7 +37,6 @@ import {
   WfoTextArea,
   WfoTimestampField,
 } from '@/components/WfoPydanticForm/fields';
-import { WfoCallout } from '@/components/WfoPydanticForm/fields';
 import { useAppSelector } from '@/rtk/hooks';
 
 const useGetComponentMatcherExtender = (): ComponentMatcherExtender => {
@@ -161,11 +163,13 @@ const useGetComponentMatcherExtender = (): ComponentMatcherExtender => {
             isControlledElement: true,
           },
           matcher(field) {
+            const fieldOptions = field.arrayItem?.options;
+
             return (
               field.type === PydanticFormFieldType.ARRAY
-              && _.isArray(field.options)
-              && field.options?.length > 0
-              && field.options?.length <= 5
+              && _.isArray(fieldOptions)
+              && fieldOptions?.length > 0
+              && fieldOptions?.length <= 5
             );
           },
           validator: zodValidationPresets.multiSelect,
@@ -180,10 +184,32 @@ const useGetComponentMatcherExtender = (): ComponentMatcherExtender => {
             return type === PydanticFormFieldType.STRING && format === ('callout' as PydanticFormFieldFormat);
           },
         },
+        {
+          id: 'cron',
+          ElementMatch: {
+            isControlledElement: true,
+            Element: WfoCron,
+          },
+          matcher: (field) => {
+            const { type, schema } = field;
+            return type === PydanticFormFieldType.STRING && schema.title === 'Cron';
+          },
+        },
+        {
+          id: 'markdownField',
+          ElementMatch: {
+            isControlledElement: false,
+            Element: WfoMarkdownField,
+          },
+          matcher: ({ format }) => {
+            return format === PydanticFormFieldFormat.MARKDOWN;
+          },
+        },
         ...currentMatchers
           .filter((matcher) => matcher.id !== 'text')
           .filter((matcher) => matcher.id !== 'array')
-          .filter((matcher) => matcher.id !== 'object'),
+          .filter((matcher) => matcher.id !== 'object')
+          .filter((matcher) => matcher.id !== 'list'),
         {
           id: 'object',
           ElementMatch: {

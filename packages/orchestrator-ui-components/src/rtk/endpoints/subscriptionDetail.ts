@@ -57,6 +57,7 @@ fragment SubscriptionDetail on SubscriptionInterface {
             workflowTarget
             workflowName
             isTask
+            note
         }
     }
 }
@@ -104,4 +105,4 @@ const subscriptionDetailApi = orchestratorApi.injectEndpoints({
   }),
 });
 
-export const { useGetSubscriptionDetailQuery } = subscriptionDetailApi;
+export const { useGetSubscriptionDetailQuery, useLazyGetSubscriptionDetailQuery } = subscriptionDetailApi;

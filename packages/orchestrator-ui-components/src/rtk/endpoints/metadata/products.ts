@@ -2,11 +2,14 @@ import { METADATA_PRODUCT_ENDPOINT } from '@/configuration/constants';
 import { BaseQueryTypes, orchestratorApi } from '@/rtk';
 import {
   BaseGraphQlResult,
+  CacheTagType,
   GraphqlQueryVariables,
   MetadataDescriptionParams,
+  MetadataStatusParams,
   ProductDefinition,
   ProductDefinitionsResult,
 } from '@/types';
+import { getCacheTag, getProductLifecycleStatus } from '@/utils';
 
 export const products = `
     query MetadataProducts(
@@ -58,7 +61,10 @@ const productsApi = orchestratorApi.injectEndpoints({
         variables,
       }),
       transformResponse: (response: ProductDefinitionsResult): ProductsResponse => {
-        const products = response.products.page || [];
+        const products = (response.products.page || []).map((product) => ({
+          ...product,
+          status: getProductLifecycleStatus(product.status),
+        }));
         const pageInfo = response.products.pageInfo || {};
 
         return {
@@ -66,6 +72,7 @@ const productsApi = orchestratorApi.injectEndpoints({
           pageInfo,
         };
       },
+      providesTags: getCacheTag(CacheTagType.metadataProducts),
     }),
   }),
 });
@@ -74,7 +81,7 @@ export const { useGetProductsQuery, useLazyGetProductsQuery } = productsApi;
 
 const productRestApi = orchestratorApi.injectEndpoints({
   endpoints: (build) => ({
-    updateProduct: build.mutation<null, MetadataDescriptionParams>({
+    updateProductDescription: build.mutation<null, MetadataDescriptionParams>({
       query: (product) => ({
         url: `${METADATA_PRODUCT_ENDPOINT}/${product.id}`,
         method: 'PATCH',
@@ -88,8 +95,25 @@ const productRestApi = orchestratorApi.injectEndpoints({
       extraOptions: {
         baseQueryType: BaseQueryTypes.fetch,
       },
+      invalidatesTags: getCacheTag(CacheTagType.metadataProducts),
+    }),
+    updateProductStatus: build.mutation<null, MetadataStatusParams>({
+      query: (product) => ({
+        url: `${METADATA_PRODUCT_ENDPOINT}/${product.id}`,
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: {
+          status: product.status,
+        },
+      }),
+      extraOptions: {
+        baseQueryType: BaseQueryTypes.fetch,
+      },
+      invalidatesTags: getCacheTag(CacheTagType.metadataProducts),
     }),
   }),
 });
 
-export const { useUpdateProductMutation } = productRestApi;
+export const { useUpdateProductDescriptionMutation, useUpdateProductStatusMutation } = productRestApi;

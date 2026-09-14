@@ -1,6 +1,6 @@
 {
   "name": "@orchestrator-ui/eslint-config-custom",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "license": "Apache-2.0",
   "description": "Contains the eslint configuration used in the Workflow orchestrator frontend projects",
   "main": "index.js",
@@ -28,14 +28,14 @@
   "dependencies": {
     "@eslint/js": "^10.0.1",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
-    "eslint": "^10.0.2",
-    "eslint-config-next": "^16.1.6",
+    "eslint": "^10.4.0",
+    "eslint-config-next": "^16.2.6",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "globals": "^17.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.6.0",
     "tsup": "^8.5.0",
-    "typescript-eslint": "^8.45.0"
+    "typescript-eslint": "^8.59.3"
   },
   "publishConfig": {
     "access": "public",

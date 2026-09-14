@@ -19,10 +19,12 @@ import { ProductBlockDefinition, ProductDefinition, ResourceTypeDefinition, Work
 function getTableConfig<T>(
   hiddenColumns: (keyof T)[] = [],
   selectedPageSize = DEFAULT_PAGE_SIZE,
+  showMatchDetails = false,
 ): StoredTableConfig<T> {
   return {
     selectedPageSize,
     hiddenColumns,
+    showMatchDetails,
   };
 }
 
@@ -42,7 +44,7 @@ export const getDefaultTableConfig = <T>(storageKey: string) => {
       return getTableConfig<T>(resourceTypeColumns as (keyof T)[]);
     }
     case METADATA_PRODUCT_TABLE_LOCAL_STORAGE_KEY: {
-      const productColumns: (keyof ProductDefinition)[] = ['productId', 'productType', 'status', 'createdAt'];
+      const productColumns: (keyof ProductDefinition)[] = ['productId', 'createdAt'];
       return getTableConfig<T>(productColumns as (keyof T)[]);
     }
     case METADATA_WORKFLOWS_TABLE_LOCAL_STORAGE_KEY: {
@@ -95,7 +97,12 @@ export const getDefaultTableConfig = <T>(storageKey: string) => {
       return getTableConfig<T>(completedTasksColumns as (keyof T)[]);
     }
     case SUBSCRIPTIONS_TABLE_LOCAL_STORAGE_KEY: {
-      const subscriptionColumns: (keyof SubscriptionListItem)[] = ['productName', 'customerFullname', 'metadata'];
+      const subscriptionColumns: (keyof SubscriptionListItem)[] = [
+        'productName',
+        'customerId',
+        'customerFullname',
+        'metadata',
+      ];
       return getTableConfig<T>(subscriptionColumns as (keyof T)[]);
     }
     default:

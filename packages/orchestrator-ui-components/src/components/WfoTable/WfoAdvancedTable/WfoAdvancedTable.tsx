@@ -8,7 +8,6 @@ import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_PAGE_SIZES,
   TableColumnKeys,
-  TableSettingsColumnConfig,
   TableSettingsConfig,
   TableSettingsModal,
   WfoErrorWithMessage,
@@ -16,7 +15,9 @@ import {
   WfoKeyValueTable,
   WfoKeyValueTableDataType,
   WfoSearchField,
+  WfoToolTip,
   clearTableConfigFromLocalStorage,
+  getTableSettingsColumns,
   setTableConfigToLocalStorage,
 } from '@/components';
 import { getRowDetailData } from '@/components/WfoTable/WfoAdvancedTable/getRowDetailData';
@@ -60,7 +61,6 @@ export const WfoAdvancedTable = <T extends object>({
   ...tableProps
 }: WfoAdvancedTableProps<T>) => {
   const { theme } = useOrchestratorTheme();
-
   const [hiddenColumns, setHiddenColumns] = useState<TableColumnKeys<T>>(defaultHiddenColumns);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedDataForDetailModal, setSelectedDataForDetailModal] = useState<T | undefined>(undefined);
@@ -80,9 +80,13 @@ export const WfoAdvancedTable = <T extends object>({
       columnType: ColumnType.CONTROL,
       width: '36px',
       renderControl: (row) => (
-        <EuiFlexItem css={{ cursor: 'pointer' }} onClick={() => setSelectedDataForDetailModal(row)}>
-          <WfoArrowsExpand color={theme.colors.textDisabled} />
-        </EuiFlexItem>
+        <WfoToolTip tooltipContent={t('showAllColumnsInDetailView')}>
+          <EuiButtonIcon
+            iconType={() => <WfoArrowsExpand color={theme.colors.textDisabled} />}
+            onClick={() => setSelectedDataForDetailModal(row)}
+            aria-label={t('showAllColumnsInDetailView')}
+          />
+        </WfoToolTip>
       ),
     },
   };
@@ -92,17 +96,7 @@ export const WfoAdvancedTable = <T extends object>({
     ...tableColumnConfig,
   };
 
-  const tableSettingsColumns: TableSettingsColumnConfig<T>[] = Object.entries(tableColumnConfig).map(
-    ([key, { label }]): TableSettingsColumnConfig<T> => {
-      const field = key as keyof T;
-
-      return {
-        field,
-        name: label,
-        isVisible: hiddenColumns.indexOf(field) === -1,
-      };
-    },
-  );
+  const tableSettingsColumns = getTableSettingsColumns(tableColumnConfig, hiddenColumns);
 
   const rowDetailData: WfoKeyValueTableDataType[] | undefined =
     selectedDataForDetailModal && getRowDetailData(selectedDataForDetailModal, tableColumnConfig);
