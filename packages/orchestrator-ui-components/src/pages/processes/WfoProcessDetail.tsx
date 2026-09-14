@@ -180,9 +180,16 @@ export const WfoProcessDetail = ({
   return (
     <>
       <WfoContentHeader
-        title={<WfoTitleWithWebsocketBadge title={pageTitle} />}
-        subtitle={
-          <WfoProductInformationWithLink productNames={productNames} workflowName={processDetail?.workflowName ?? ''} />
+        title={
+          <WfoTitleWithWebsocketBadge
+            title={pageTitle}
+            extraElement={
+              <WfoProductInformationWithLink
+                productNames={productNames}
+                workflowName={processDetail?.workflowName ?? ''}
+              />
+            }
+          />
         }
       >
         <WfoIsAllowedToRender resource={PolicyResource.PROCESS_RETRY}>

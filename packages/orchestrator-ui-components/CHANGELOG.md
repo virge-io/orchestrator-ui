@@ -1,5 +1,208 @@
 # @orchestrator-ui/orchestrator-ui-components
 
+## 8.9.2
+
+### Patch Changes
+
+- 3a6339f: 223 Tweak spacing of columns in table settings modal
+- 2719ec4: Disables list component.
+
+## 8.9.1
+
+### Patch Changes
+
+- 0e5b816: Fix query and filter not being applied in certain cases
+
+## 8.9.0
+
+### Minor Changes
+
+- 906e6c2: Exports getActionItemsByTarget function
+
+### Patch Changes
+
+- 837abaf: 212 Add explanation for the subscriptions search page
+- e4de79c: Define and use ProductLifecycle enum in accordance with backend
+
+## 8.8.2
+
+### Patch Changes
+
+- a5f84aa: Add an "Advanced nested search" toggle to the search table settings. When disabled, the filter builder's field selector hides all fully qualified (dotted) paths from the autocomplete suggestions (e.g. subscription.ip_peer_group_block.peer_type) and only offers plain field names (e.g. peer_type); the prefilled field options are unaffected. The setting is persisted with the other table settings and defaults to enabled.
+- 83c03da: Adjust publish to npm action
+- 83c03da: Align WfoProductInformationWithLink
+- cf7a86d: Fixes multicheckbox form element matching and clientside validation
+- f59faaa: Apply the configured number of rows on the beta subscriptions search page: the stored setting is applied on page load, changing it in the table settings modal restarts the search with the new size, and each "Load more" then fetches that many rows (up to the backend maximum of 100) instead of always 15
+- 0695e03: Show skeleton rows in WfoStructuredSearchTable (search POC page) for longer running searches. A search that is still loading after a short delay replaces the current results with skeleton rows matching the configured number of rows from the table settings; fast searches keep the current results with only the loading line.
+- 1a0c61f: Cap the height of the column visibility list in the table settings modal so tables with many columns scroll inside the modal instead of growing it beyond the screen. A shadow at the bottom edge of the list, shown only while there are more rows below, hints that the list scrolls
+
+## 8.8.1
+
+### Patch Changes
+
+- 074dce3: Adjust publish to npm action
+- e6a276d: 176 Fix styling issues with worfklow guide panel- #2673
+- 8bc73e4: Fix the workflow guide panel button sliding under the sticky timeline when the page is scrolled to the end on shorter viewports: its fixed minimum height could exceed the available viewport space, so the sticky bottom clamp pushed its top out of view. The minimum height is now capped by the same space the maximum height already uses
+
+## 8.8.0
+
+### Minor Changes
+
+- 1ef8034: Adds toggle to show/hide validate tasks on subscription details processes tab
+
+### Patch Changes
+
+- 3b413e5: PR-2677: Change hardcoded colors WfoSearch to theme colors
+- b84f608: add notes column to task list page
+- b8aaed7: Fix scheduled task create/delete requests to use the canonical /api/schedules/ endpoint with a trailing slash, avoiding unnecessary HTTP redirects
+- 67e77eb: 205 Add toggle to show match details for rows in search page. With the toggle off, a row's match details are revealed while hovering the row, without the flickering that occurred when the cursor sat on the row edge
+- 2558ed2: Fix the note column on the workflows and tasks lists keeping the previous page's note when paginating to a row without a note. EuiInlineEditText only follows its value prop while the value is truthy, so empty notes are now passed as the invisible character, the same way the subscription note edits already do
+
+## 8.7.3
+
+### Patch Changes
+
+- f88e3ef: Bug fixes for subscription search
+
+## 8.7.2
+
+### Patch Changes
+
+- a5ce17a: Minor comment improvements
+- af9eaf6: Fixes subscription search has component and range filters
+
+## 8.7.1
+
+### Patch Changes
+
+- 64ec9c8: Handles summaryForm translation client side
+- da99ddd: Adds missing NL translations
+
+## 8.7.0
+
+### Minor Changes
+
+- f19e786: Add wfoCron field for entering crontab field in forms
+
+### Patch Changes
+
+- 8fa9a49: Filter builder: focus moves to the value editor after selecting a field, operator and value are preserved across field changes, and operators restored from a CEL filter string are no longer rewritten to the field's default operator. Enter in a value editor or in the filter textarea applies the filter like the Apply button; Shift+Enter inserts a newline in the textarea
+- be89cdd: Filter out control column in table and move duplicated code to utils
+
+## 8.6.0
+
+### Minor Changes
+
+- 2447ecc: 163: Replace the crosses with a trash icon, move the AND/OR toggle between the two search rules, fix the scrollbar in textarea
+
+## 8.5.0
+
+### Minor Changes
+
+- 3a19051: 171 Add workflow user guides to forms and worflow steps list page
+
+### Patch Changes
+
+- 3518b34: Show error toast on tasks that return 412 error code
+- 10bec09: Add active tab component to filter on subscription statuses search poc page
+
+## 8.4.5
+
+### Patch Changes
+
+- f668ff0: Updates to latest pydantic-forms version
+
+## 8.4.4
+
+### Patch Changes
+
+- 11f00ba: Fix product state filter not working correctly for non-active products
+
+## 8.4.3
+
+### Patch Changes
+
+- 9b6ba2c: Updates to latest pydantic-forms version
+
+## 8.4.2
+
+### Patch Changes
+
+- bc5b080: Downgrades eleastic eui peer dependency
+
+## 8.4.1
+
+### Patch Changes
+
+- 1858b76: Hides codeview selector for stepforms
+
+## 8.4.0
+
+### Minor Changes
+
+- e5de245: Removed the Agent page feature as this will be pivoted to a different client
+- 07e322c: Update dependencies to latest non-breaking changes
+
+### Patch Changes
+
+- b3afb03: Fix stepForm bug. Fix linting error.
+- 6dc24b7: Added tooltip on expand row to detail view icon in wfotable and added EUI highlighting
+  Changed colour of subscription delta to grey (textdisabled)
+  Hide the expand icon next to status badge in metadata/products
+  By default show type and status in metadata/products
+
+## 8.3.0
+
+### Minor Changes
+
+- 4fac1f8: 140 Add react node to WfoTitleWithWebsocketBadge
+
+## 8.2.0
+
+### Minor Changes
+
+- 1c8d848: Export const for callout colors
+
+### Patch Changes
+
+- ecaa4d2: Track workflow status from action menu to prevent a double workflow run
+- 5cb7c21: 2637 Show workflow changes (subscription delta) in workflow list page
+
+## 8.1.1
+
+### Patch Changes
+
+- dc7bddb: Updates npm dependencies
+
+## 8.1.0
+
+### Minor Changes
+
+- 16e1ab1: Added 'note' field to graphql queries and a WfoInlineEdit field to multiple places. **NOTE** Requires PATCH /processes/{process_id} endpoint in WFO backend
+- fdb4364: Makes product metadata status and descriptio editable
+
+### Patch Changes
+
+- 7c4b366: Updates compatability matrix
+
+## 8.0.0
+
+### Major Changes
+
+- 70ef6eb: Updates to verion pydantic-forms-ui 2.\*. Adds override step header and step details option.
+
+## 7.7.0
+
+### Minor Changes
+
+- d40df81: Add overridable components to Step entries
+- ef68a85: Change RTK streamMessages to be re-usable with other websocket endpoints
+- 2d7ff7a: Change Schedule Task Form to use form data from backend when backend version is 5.0.0a7 or higher
+
+### Patch Changes
+
+- 2b0cdf5: Add direct link to latest validate workflow in SubscriptionDetail (#2490)
+
 ## 7.6.0
 
 ### Minor Changes

@@ -31,6 +31,9 @@ export const getWfoTableStyles = ({ theme, isDarkModeActive }: WfoThemeHelpers) 
 
   const tableContainerStyle = css({
     overflowX: 'auto',
+    // Query container so descendants (e.g. expanded rows) can size to the
+    // visible table width with cqw units instead of the full table width
+    containerType: 'inline-size',
   });
 
   const tableStyle = css({
@@ -157,6 +160,15 @@ export const getWfoTableStyles = ({ theme, isDarkModeActive }: WfoThemeHelpers) 
     '.eui-xScroll': { display: 'flex', justifyContent: 'flex-start' },
   });
 
+  const showExpandedRowStyle = css({
+    '& + tr': { display: 'table-row' },
+  });
+
+  const toggleExpandedRowOnHoverStyle = css({
+    '&:hover + tr, &:focus-within + tr': { display: 'table-row' },
+    '& + tr:hover, & + tr:focus-within': { display: 'table-row' },
+  });
+
   return {
     tableContainerStyle,
     tableStyle,
@@ -174,5 +186,7 @@ export const getWfoTableStyles = ({ theme, isDarkModeActive }: WfoThemeHelpers) 
     dragAndDropStyle,
     paginationStyle,
     setWidth,
+    showExpandedRowStyle,
+    toggleExpandedRowOnHoverStyle,
   };
 };

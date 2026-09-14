@@ -1,3 +1,4 @@
+export * from './WfoAutoExpandableTextArea';
 export * from './WfoBadges';
 export * from './WfoBackendUnavailable';
 export * from './WfoAvailabilityCheck';
@@ -38,7 +39,7 @@ export * from './WfoTableCodeBlock';
 export * from './WfoInlineEdit';
 export * from './WfoPydanticForm';
 export * from './WfoSearchPage';
-export * from './WfoAgent';
+export * from './WfoWorkflowUserGuide';
 export * from './WfoMonacoCodeBlock';
 export * from './WfoLogoSpinner';
 export * from './WfoPopover';

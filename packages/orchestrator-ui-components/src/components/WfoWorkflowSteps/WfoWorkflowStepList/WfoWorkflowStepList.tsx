@@ -2,8 +2,15 @@ import React, { Ref, useEffect, useState } from 'react';
 
 import { useTranslations } from 'next-intl';
 
-import { WfoJsonCodeBlock, WfoLoading, WfoStepList, WfoStepListHeader, WfoStepListRef } from '@/components';
-import WfoDiff from '@/components/WfoDiff/WfoDiff';
+import {
+  WfoJsonCodeBlock,
+  WfoLoading,
+  WfoPageWithUserGuide,
+  WfoStepList,
+  WfoStepListHeader,
+  WfoStepListRef,
+} from '@/components';
+import WfoDiff, { getSubscriptionDiffTexts } from '@/components/WfoDiff/WfoDiff';
 import { WfoTraceback } from '@/components/WfoWorkflowSteps/WfoTraceback/WfoTraceback';
 import { useGetRawProcessDetailQuery } from '@/rtk/endpoints/processDetail';
 import { ProcessStatus, Step, StepStatus } from '@/types';
@@ -21,6 +28,7 @@ export interface WfoWorkflowStepListProps {
   traceBack: string | null;
   startedAt: string;
   processId: string;
+  workflowName?: string;
   isTask: boolean;
   userInputForm?: InputForm;
   userPermissions: FormUserPermissions;
@@ -33,25 +41,23 @@ export const WfoProcessRawData = ({ processId }: { processId: string }) => {
 
 export const WfoProcessSubscriptionDelta = ({ processId }: { processId: string }) => {
   const { data, isFetching } = useGetRawProcessDetailQuery({ processId });
+  const { oldText, newText } = getSubscriptionDiffTexts(data);
 
-  const subscriptionId = data?.current_state?.subscription?.subscription_id ?? '';
-  const newText = data?.current_state?.subscription ?? null;
-  const oldSubscriptions = data?.current_state?.__old_subscriptions__ || {};
-  const oldSubscription = subscriptionId in oldSubscriptions ? oldSubscriptions[subscriptionId] : null;
-  const oldText = oldSubscription || null;
-
-  return isFetching ?
-      <WfoLoading />
-    : <WfoDiff
-        oldText={oldText ? JSON.stringify(oldText, null, 2) : ''}
-        newText={newText ? JSON.stringify(newText, null, 2) : ''}
-        syntax="javascript"
-      />;
+  return isFetching ? <WfoLoading /> : <WfoDiff oldText={oldText} newText={newText} syntax="javascript" />;
 };
 
 export const WfoWorkflowStepList = React.forwardRef(
   (
-    { steps = [], lastStatus, traceBack, processId, isTask, userInputForm, userPermissions }: WfoWorkflowStepListProps,
+    {
+      steps = [],
+      lastStatus,
+      traceBack,
+      processId,
+      workflowName,
+      isTask,
+      userInputForm,
+      userPermissions,
+    }: WfoWorkflowStepListProps,
     reference: Ref<WfoStepListRef>,
   ) => {
     const [showHiddenKeys, setShowHiddenKeys] = useState(false);
@@ -154,16 +160,19 @@ export const WfoWorkflowStepList = React.forwardRef(
         {showRaw && <WfoProcessRawData processId={processId} />}
         {showDelta && <WfoProcessSubscriptionDelta processId={processId} />}
         {!showRaw && !showDelta && (
-          <WfoStepList
-            ref={reference}
-            stepListItems={stepListItems}
-            showHiddenKeys={showHiddenKeys}
-            isTask={isTask}
-            onToggleExpandStepListItem={toggleExpandedStateStepListItem}
-            processId={processId}
-            onTriggerExpandStepListItem={handleExpandStepListItem}
-            userPermissions={userPermissions}
-          />
+          <WfoPageWithUserGuide workflowName={workflowName}>
+            <WfoStepList
+              ref={reference}
+              stepListItems={stepListItems}
+              showHiddenKeys={showHiddenKeys}
+              isTask={isTask}
+              onToggleExpandStepListItem={toggleExpandedStateStepListItem}
+              processId={processId}
+              workflowName={workflowName}
+              onTriggerExpandStepListItem={handleExpandStepListItem}
+              userPermissions={userPermissions}
+            />
+          </WfoPageWithUserGuide>
         )}
       </>
     );

@@ -9,7 +9,9 @@ import {
   ProductBlockInstance,
   SortOrder,
   SubscriptionAction,
+  SubscriptionActions,
   SubscriptionDetailProcess,
+  SubscriptionRelation,
   WorkflowTarget,
 } from '@/types';
 
@@ -40,21 +42,25 @@ export const getProductBlockTitle = (instanceValues: FieldValue[]): string | num
   return title;
 };
 
-export const flattenArrayProps = (action: SubscriptionAction): TranslationValues => {
+const toLabel = (item: string | SubscriptionRelation): string =>
+  typeof item === 'object' ? (item.subscription_description ?? item.subscription_id) : item;
+
+export const flattenSubscriptionActionProps = (action?: SubscriptionAction | null): TranslationValues => {
+  if (!action) return {};
+
   const flatObject: TranslationValues = {};
   for (const [key, value] of Object.entries(action)) {
     if (Array.isArray(value)) {
-      flatObject[key] = value.join(', ');
-    } else {
+      flatObject[key] = value.map(toLabel).join(', ');
+    } else if (typeof value !== 'object' || value === null) {
       flatObject[key] = value;
     }
   }
-  return action ? flatObject : {};
+  return flatObject;
 };
 
 export const getWorkflowTargetColor = (workflowTarget: WorkflowTarget, theme: EuiThemeComputed) => {
-  // Data returned from graphql can't always be depended on to be lowercase
-  switch (workflowTarget.toLocaleLowerCase()) {
+  switch (workflowTarget) {
     case WorkflowTarget.CREATE:
       return theme.colors.textSuccess;
     case WorkflowTarget.MODIFY:
@@ -72,8 +78,7 @@ export const getWorkflowTargetColor = (workflowTarget: WorkflowTarget, theme: Eu
 };
 
 export const getWorkflowTargetIconContent = (workflowTarget: WorkflowTarget) => {
-  // Data returned from graphql can't always be depended on to be lowercase
-  switch (workflowTarget.toLocaleLowerCase()) {
+  switch (workflowTarget) {
     case WorkflowTarget.CREATE:
       return 'C';
     case WorkflowTarget.SYSTEM:
@@ -184,4 +189,18 @@ export const mapProductBlockInstancesToEuiSelectableOptions = (
       ids,
     },
   }));
+};
+
+export const getActionItemsByTarget = (
+  workflowTarget: WorkflowTarget,
+  subscriptionActions?: SubscriptionActions,
+): SubscriptionAction[] => {
+  // https://github.com/workfloworchestrator/orchestrator-core/issues/1820 will align the WorkflowTarget enum and make it
+  // uppercase. We support both for now. The lowercase keys are deliberately not part of the
+  // SubscriptionActions type, so the fallback is a runtime-only check behind a cast.
+  const actionsByTarget = subscriptionActions as unknown as
+    | Record<string, SubscriptionAction[] | undefined>
+    | undefined;
+
+  return actionsByTarget?.[workflowTarget] ?? actionsByTarget?.[workflowTarget.toLowerCase()] ?? [];
 };

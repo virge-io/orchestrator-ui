@@ -134,12 +134,12 @@ export interface ProductDefinition {
 export type ProductsSummary = Pick<ProductDefinition, 'name'> & SubscriptionsResult<never>;
 
 export enum WorkflowTarget {
-  CREATE = 'create',
-  MODIFY = 'modify',
-  TERMINATE = 'terminate',
-  SYSTEM = 'system',
-  VALIDATE = 'validate',
-  RECONCILE = 'reconcile',
+  CREATE = 'CREATE',
+  MODIFY = 'MODIFY',
+  TERMINATE = 'TERMINATE',
+  SYSTEM = 'SYSTEM',
+  VALIDATE = 'VALIDATE',
+  RECONCILE = 'RECONCILE',
 }
 
 export type Process = {
@@ -164,6 +164,7 @@ export type Process = {
   subscriptions: {
     page: Pick<Subscription, 'subscriptionId' | 'description'>[];
   };
+  note: string | null;
 };
 
 // These step statusses match the ones in the backend
@@ -204,6 +205,7 @@ export interface ProcessDetail {
   customer: {
     fullname: string;
   };
+  note: string | null;
 }
 
 // From backend
@@ -469,7 +471,7 @@ export type Subscription = {
   status: SubscriptionStatus;
   product: Pick<ProductDefinition, 'name' | 'tag' | 'productType'>;
   productBlockInstances: ProductBlockInstance[];
-  customer: Pick<Customer, 'fullname' | 'shortcode'>;
+  customer: Pick<Customer, 'customerId' | 'fullname' | 'shortcode'>;
   metadata: object;
 };
 
@@ -501,10 +503,15 @@ export type MetadataDescriptionParams = {
   description: string;
 };
 
-// export type Workflow = {
-//     workflow_id: string;
-//     description: string;
-// };
+export type ProcessPatchParams = {
+  id: string;
+  note: string | null;
+};
+
+export type MetadataStatusParams = {
+  id: string;
+  status: ProductLifecycleStatus;
+};
 
 export type SubscriptionDetail = {
   subscriptionId: string;
@@ -535,7 +542,7 @@ export type SubscriptionDetail = {
 
 export type SubscriptionDetailProcess = Pick<
   Process,
-  'processId' | 'lastStatus' | 'startedAt' | 'createdBy' | 'workflowTarget' | 'workflowName' | 'isTask'
+  'processId' | 'lastStatus' | 'startedAt' | 'createdBy' | 'workflowTarget' | 'workflowName' | 'isTask' | 'note'
 >;
 
 export type RelatedSubscription = Pick<
@@ -581,6 +588,7 @@ export type OrchestratorConfig = {
   useWebSockets: boolean;
   useThemeToggle: boolean;
   showWorkflowInformationLink: boolean;
+  showWorkflowUserGuide: boolean;
   enableSupportMenuItem: boolean;
   supportMenuItemUrl: string;
   enableAoStackStatus: boolean;
@@ -593,14 +601,21 @@ export enum ColorModes {
   DARK = 'DARK',
 }
 
+export interface SubscriptionRelation {
+  subscription_id: string;
+  subscription_description: string;
+}
+
+// TODO: remove locked_relations and unterminated_in_use_by_subscriptions (UUID-only fields) when orchestrator-core 6.0.0 is released and only use the _detail variants
 export interface SubscriptionAction {
   name: string;
   description: string;
   reason?: string;
   usable_when?: string[];
   locked_relations?: string[];
-  unterminated_parents?: string[];
+  locked_relations_detail?: SubscriptionRelation[];
   unterminated_in_use_by_subscriptions?: string[];
+  unterminated_in_use_by_subscriptions_detail?: SubscriptionRelation[];
   status?: string;
   action?: string;
 }
@@ -608,11 +623,12 @@ export interface SubscriptionAction {
 export type SubscriptionActions = {
   reason?: string;
   locked_relations?: string[];
-  modify: SubscriptionAction[];
-  terminate: SubscriptionAction[];
-  system: SubscriptionAction[];
-  validate: SubscriptionAction[];
-  reconcile: SubscriptionAction[];
+  locked_relations_detail?: SubscriptionRelation[];
+  [WorkflowTarget.MODIFY]: SubscriptionAction[];
+  [WorkflowTarget.TERMINATE]: SubscriptionAction[];
+  [WorkflowTarget.SYSTEM]: SubscriptionAction[];
+  [WorkflowTarget.VALIDATE]: SubscriptionAction[];
+  [WorkflowTarget.RECONCILE]: SubscriptionAction[];
 };
 
 export enum CacheTagType {
@@ -622,6 +638,7 @@ export enum CacheTagType {
   processStatusCounts = 'processStatusCounts',
   subscriptions = 'subscriptions',
   scheduledTasks = 'scheduledTags',
+  metadataProducts = 'metadataProducts',
 }
 
 export interface MappedVersion {

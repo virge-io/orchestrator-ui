@@ -1,4 +1,9 @@
-export type EntityKind = 'SUBSCRIPTION' | 'PRODUCT' | 'WORKFLOW' | 'PROCESS';
+export enum EntityKind {
+  SUBSCRIPTION = 'SUBSCRIPTION',
+  PRODUCT = 'PRODUCT',
+  WORKFLOW = 'WORKFLOW',
+  PROCESS = 'PROCESS',
+}
 
 export enum RetrieverType {
   Auto = 'auto',
@@ -19,15 +24,21 @@ export interface SearchResult {
   entity_title: string;
   score: number;
   perfect_match: number;
-  matching_field?: MatchingField | null;
+  matching_fields?: MatchingField[] | null;
+  response_columns: Record<string, string | number | null>;
 }
 
 /** Paginated search results */
 export type PaginatedSearchResults = {
   data: SearchResult[];
+  cursor: {
+    total_items: number;
+    start_cursor: number;
+    end_cursor: number;
+  };
   page_info: {
     has_next_page: boolean;
-    next_page_cursor: number | null;
+    next_page_cursor: string | null;
   };
   search_metadata: {
     search_type: string | null;
@@ -78,12 +89,17 @@ export type PathFilter = {
     | LtreeMatchesFilter;
 };
 
+export interface OperatorDisplay {
+  symbol: string;
+  description: string;
+}
+
 type ActionType = 'select';
 
 type BaseSearchParameters = {
   query?: string | null;
 
-  filters?: PathFilter[] | Group | null;
+  filters?: PathFilter[] | Filter | null;
 
   action: ActionType;
 };
@@ -116,9 +132,9 @@ export type Condition = {
   condition: { op: string; value?: unknown };
 };
 
-export type Group = {
+export type Filter = {
   op: 'AND' | 'OR';
-  children: Array<Group | Condition>;
+  children: Array<Filter | Condition>;
 };
 
 export type value_schema = {
@@ -194,4 +210,15 @@ export type ExportArtifact = {
   query_id: string;
   download_url: string;
   description: string;
+};
+
+export type ResultColumToPropertyMap<T> = Map<string, keyof T>;
+export type FieldToOperatorMap = Map<string, string[]>;
+
+export type WfoQueryBuilderContext = {
+  onFieldSelected: (field: string, operators: string[], pathInfo?: PathInfo) => void;
+  prefilledFieldOptions: FieldToOperatorMap;
+  fieldPathInfoMap: Map<string, PathInfo>;
+  onValueEditorEnter: () => void;
+  useAdvancedNestedSearch: boolean;
 };
