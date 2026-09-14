@@ -42,7 +42,7 @@ const FALLBACK_SUBMODULE_URL = 'https://github.com/workfloworchestrator/example-
  * Paths owned by this fork. They are taken from the current branch and re-applied
  * after the upstream tree is laid down, so they survive every sync.
  */
-const FORK_OWNED_PATHS = ['scripts', 'DEPLOY.md', '.github/workflows/block-deploy-to-main.yml'];
+const FORK_OWNED_PATHS = ['scripts', 'DEPLOY.md', 'UPGRADING.md', '.github/workflows/block-deploy-to-main.yml'];
 
 /**
  * Merged into the upstream package.json after each sync.
@@ -66,6 +66,13 @@ const PACKAGE_JSON_OVERLAY = {
  * only the fork's own workflows (via FORK_OWNED_PATHS) are put back.
  */
 const WORKFLOWS_DIR = '.github/workflows';
+
+/**
+ * Excluded from the --dry-run comparison: build output and other untracked noise, plus
+ * package-lock.json, which at this point still holds upstream's version because the overlay's
+ * lockfile refresh only runs during a real sync.
+ */
+const DRY_RUN_EXCLUDES = ['.git', 'node_modules', '.next', '.turbo', 'dist', '_', 'package-lock.json'];
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoDir = path.resolve(scriptDir, '..');
@@ -494,11 +501,15 @@ function main() {
 
     if (options.dryRun) {
       logStep('Dry run: comparing the generated tree against the current branch');
-      const diff = run('diff', ['-rq', '--exclude=.git', '--exclude=node_modules', repoDir, treeDir], {
-        capture: true,
-        allowFailure: true,
-      });
-      console.log(diff.stdout || '    (no differences)');
+      const diff = run(
+        'diff',
+        ['-rq', ...DRY_RUN_EXCLUDES.map((pattern) => `--exclude=${pattern}`), repoDir, treeDir],
+        { capture: true, allowFailure: true },
+      );
+      console.log(diff.stdout || '    (no content differences)');
+      console.log(
+        '\nNote: package-lock.json is excluded above; a real sync regenerates it after applying the overlay.',
+      );
       console.log('\n==> Dry run complete; the branch was not modified.');
       return;
     }

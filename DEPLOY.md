@@ -8,6 +8,9 @@ Upstream keeps the example GUI at `apps/wfo-ui` as a **git submodule** pointing 
 Vercel does not check out submodules, so a plain fork builds an empty app. The fix is to
 replace the submodule with a checkout of its content, committed as ordinary tracked files.
 
+For the step-by-step procedure to pull in a new upstream release, see [UPGRADING.md](UPGRADING.md).
+This file explains the layout and the reasoning behind it.
+
 Two scripts cover that, both dependency-free at the point of use:
 
 | Script                                        | What it does                                                                      |
@@ -63,6 +66,7 @@ listed in `FORK_OWNED_PATHS` in `scripts/sync-upstream.mjs`:
 
 - `scripts/` — the deploy and sync tooling
 - `DEPLOY.md` — this file
+- `UPGRADING.md` — the step-by-step upgrade runbook
 - `.github/workflows/block-deploy-to-main.yml`
 
 Plus the `package.json` overlay (`PACKAGE_JSON_OVERLAY` in the same file), which re-adds the
