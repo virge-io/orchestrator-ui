@@ -2,7 +2,7 @@
 
 This is the runbook for pulling a new
 [orchestrator-ui-library](https://github.com/workfloworchestrator/orchestrator-ui-library)
-release into this fork. See [DEPLOY.md](DEPLOY.md) for *why* the repo is laid out the way it is.
+release into this fork. See [DEPLOY.md](DEPLOY.md) for _why_ the repo is laid out the way it is.
 
 This file is fork-owned and does not exist upstream, so editing it can never cause a merge
 conflict during a sync.
@@ -54,7 +54,7 @@ git show '@orchestrator-ui/orchestrator-ui-components@9.0.0:version-compatibilit
 ```
 
 Each entry means "UI at this version or newer requires orchestrator-core at least this version".
-Confirm your backend meets it *before* you deploy.
+Confirm your backend meets it _before_ you deploy.
 
 **Upstream's own upgrade notes** — these exist only for releases with breaking changes:
 
@@ -92,22 +92,22 @@ npm run sync:upstream
 
 Requires a clean working tree. Useful flags:
 
-| Flag                    | Use                                                                 |
-| ----------------------- | ------------------------------------------------------------------- |
-| `--version X.Y.Z`       | Take a specific release instead of the newest                        |
-| `--tag <tag>`           | Take an exact tag                                                    |
-| `--branch <name>`       | Switch to that branch first                                          |
-| `--submodule-ref main`  | Take the example app's tip rather than the commit the tag pins       |
-| `--push`                | Push when done                                                       |
-| `--skip-lockfile`       | Skip the `package-lock.json` refresh                                 |
-| `--allow-dirty`         | Proceed with an unclean tree (last resort)                           |
+| Flag                   | Use                                                            |
+| ---------------------- | -------------------------------------------------------------- |
+| `--version X.Y.Z`      | Take a specific release instead of the newest                  |
+| `--tag <tag>`          | Take an exact tag                                              |
+| `--branch <name>`      | Switch to that branch first                                    |
+| `--submodule-ref main` | Take the example app's tip rather than the commit the tag pins |
+| `--push`               | Push when done                                                 |
+| `--skip-lockfile`      | Skip the `package-lock.json` refresh                           |
+| `--allow-dirty`        | Proceed with an unclean tree (last resort)                     |
 
 By default it takes the example app at the commit **the release tag pins**, which is the
 combination upstream tested. Use `--submodule-ref main` only when you specifically need the
 example app's newest commits.
 
-Re-running the script when nothing has changed is safe: it reports *"already matches upstream
-X.Y.Z; nothing to commit"* and leaves the tree clean.
+Re-running the script when nothing has changed is safe: it reports _"already matches upstream
+X.Y.Z; nothing to commit"_ and leaves the tree clean.
 
 ## Step 3 — Verify locally
 
@@ -178,9 +178,9 @@ a new filename and add that path to `FORK_OWNED_PATHS`. Details in [DEPLOY.md](D
 
 Checked when this fork moved from 7.6.0 to 8.9.2 — keep appending as you upgrade.
 
-| Release | What to watch for                                                                                                                                                   |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 7.7.0   | Requires **orchestrator-core ≥ 5.0.0**. Anything at or above this needs a Core 5 backend.                                                                            |
+| Release | What to watch for                                                                                                                                                     |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 7.7.0   | Requires **orchestrator-core ≥ 5.0.0**. Anything at or above this needs a Core 5 backend.                                                                             |
 | 8.0.0   | `pydantic-forms` 1.x → 2.x. Custom form components reading `useGetConfig()` must use `componentMatcher` instead of `componentMatcherExtender`.                        |
 | 8.4.0   | Agent/CopilotKit feature **removed** (`WfoAgent`, `pages/agent.tsx`, `pages/api/copilotkit.ts`, the `@copilotkit/*` and `@elastic/charts` deps). No longer available. |
 

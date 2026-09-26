@@ -13,10 +13,10 @@ This file explains the layout and the reasoning behind it.
 
 Two scripts cover that, both dependency-free at the point of use:
 
-| Script                                        | What it does                                                                      |
-| --------------------------------------------- | --------------------------------------------------------------------------------- |
-| `npm run sync:upstream` (`scripts/sync-upstream.mjs`) | Rebuilds **this branch** from the latest upstream release tag, flattened.   |
-| `npm run deploy` (`scripts/deploy.mjs`)       | Builds a **separate `deploy-X.Y.Z` branch** from any tag, flattened.               |
+| Script                                                | What it does                                                              |
+| ----------------------------------------------------- | ------------------------------------------------------------------------- |
+| `npm run sync:upstream` (`scripts/sync-upstream.mjs`) | Rebuilds **this branch** from the latest upstream release tag, flattened. |
+| `npm run deploy` (`scripts/deploy.mjs`)               | Builds a **separate `deploy-X.Y.Z` branch** from any tag, flattened.      |
 
 ## Layout
 

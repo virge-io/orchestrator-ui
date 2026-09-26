@@ -232,12 +232,7 @@ implementation adds three extra entries — `Example form`, `Search`, and
 `Agent` — by appending to the default menu items:
 
 ```tsx
-const addMenuItems = (defaultMenuItems) => [
-    ...defaultMenuItems,
-    { name: 'Example form', id: '10', href: '/example-form' /* … */ },
-    { name: 'Search', id: '20', href: '/search' /* … */ },
-    { name: 'Agent', id: '30', href: '/agent' /* … */ },
-];
+const addMenuItems = (defaultMenuItems) => [...defaultMenuItems, { name: 'Example form', id: '10', href: '/example-form' /* … */ }, { name: 'Search', id: '20', href: '/search' /* … */ }, { name: 'Agent', id: '30', href: '/agent' /* … */ }];
 ```
 
 Add, remove, or reorder entries here to shape your own navigation.
