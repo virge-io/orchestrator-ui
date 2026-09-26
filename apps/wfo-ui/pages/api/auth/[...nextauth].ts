@@ -8,6 +8,8 @@ import {
     getEnvironmentVariables,
 } from '@orchestrator-ui/orchestrator-ui-components';
 
+import { groupsFromToken } from '@/policy/groupPolicy';
+
 const {
     OAUTH2_ACTIVE,
     OAUTH2_CLIENT_ID,
@@ -65,6 +67,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
         if (response.ok) {
             const data: {
                 access_token: string;
+                id_token?: string;
                 expires_in: number;
                 refresh_token: string;
                 refresh_expires_in: number;
@@ -72,6 +75,8 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 
             return {
                 ...token,
+                // Group membership can change while logged in; the refreshed token carries the current groups.
+                groups: groupsFromToken(data.id_token ?? data.access_token),
                 accessToken: data.access_token,
                 accessTokenExpiresAt: calculateExpirationDate(data.expires_in),
                 refreshToken: data.refresh_token,
@@ -143,6 +148,10 @@ export const authOptions: AuthOptions = {
                 return {
                     ...token,
                     accessToken: account.access_token,
+                    // Cognito puts the groups in the tokens, not in the userinfo response.
+                    groups: groupsFromToken(
+                        account.id_token ?? account.access_token,
+                    ),
                     refreshToken: account.refresh_token,
                     accessTokenExpiresAt: account.expires_at as number,
                     refreshTokenExpiresAt: calculateExpirationDate(
@@ -168,11 +177,12 @@ export const authOptions: AuthOptions = {
         }: {
             session: WfoSession;
             token: JWT;
-        }): Promise<WfoSession> {
+        }): Promise<WfoSession & { groups: string[] }> {
             // Assign data to the session to be available in the client through the useSession hook
             return {
                 ...session,
                 profile: token.profile as WfoUserProfile | undefined,
+                groups: (token.groups as string[] | undefined) ?? [],
                 accessToken: token.accessToken ? String(token.accessToken) : '',
                 accessTokenExpiresAt: token.accessTokenExpiresAt as number,
                 refreshTokenExpiresAt: token.refreshTokenExpiresAt as number,

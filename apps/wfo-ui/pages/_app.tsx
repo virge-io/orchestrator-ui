@@ -19,10 +19,10 @@ import {
     OrchestratorConfig,
     OrchestratorConfigProvider,
     StoreProvider,
-    WfoAuth,
     WfoErrorBoundary,
     WfoErrorMonitoring,
     WfoErrorMonitoringProvider,
+    WfoIsAllowedToRender,
     WfoLogoSpinner,
     WfoMenuItemLink,
     WfoPageTemplate,
@@ -32,7 +32,9 @@ import {
 } from '@orchestrator-ui/orchestrator-ui-components';
 
 import { getAppLogo } from '@/components/AppLogo/AppLogo';
+import { WfoGroupAuth } from '@/components/WfoGroupAuth';
 import { getInitialOrchestratorConfig } from '@/configuration';
+import { SEARCH_RESOURCE } from '@/policy/groupPolicy';
 import { TranslationsProvider } from '@/translations/translationsProvider';
 
 import '../font/inter.css';
@@ -67,11 +69,13 @@ function CustomApp({ Component, pageProps }: AppProps & AppOwnProps) {
             isSelected: router.pathname === '/search',
             href: '/search',
             renderItem: () => (
-                <WfoMenuItemLink
-                    path={'/search'}
-                    translationString="Search"
-                    isSelected={router.pathname === '/search'}
-                />
+                <WfoIsAllowedToRender resource={SEARCH_RESOURCE}>
+                    <WfoMenuItemLink
+                        path={'/search'}
+                        translationString="Search"
+                        isSelected={router.pathname === '/search'}
+                    />
+                </WfoIsAllowedToRender>
             ),
         },
     ];
@@ -95,7 +99,7 @@ function CustomApp({ Component, pageProps }: AppProps & AppOwnProps) {
                         <WfoErrorMonitoringProvider
                             errorMonitoringHandler={errorMonitoringHandler}
                         >
-                            <WfoAuth>
+                            <WfoGroupAuth>
                                 <EuiProvider
                                     colorMode={colorMode}
                                     modify={wfoThemeModifications}
@@ -138,7 +142,7 @@ function CustomApp({ Component, pageProps }: AppProps & AppOwnProps) {
                                         </main>
                                     </TranslationsProvider>
                                 </EuiProvider>
-                            </WfoAuth>
+                            </WfoGroupAuth>
                         </WfoErrorMonitoringProvider>
                     </SessionProvider>
                 </StoreProvider>
