@@ -24,8 +24,8 @@ git push origin main
 upstream release fresh, then puts this fork's own files back on top. There is nothing to
 conflict, and the result is always exactly upstream plus a known, listed overlay.
 
-The trade-off: **any local edit to a path that is not fork-owned is silently discarded on the
-next sync.** See [Keeping a local change](#keeping-a-local-change).
+The trade-off: **any local edit to a path that is neither fork-owned nor kept as a patch in
+`fork-patches/` is silently discarded on the next sync.** See [Keeping a local change](#keeping-a-local-change).
 
 ---
 
@@ -100,6 +100,7 @@ Requires a clean working tree. Useful flags:
 | `--submodule-ref main` | Take the example app's tip rather than the commit the tag pins |
 | `--push`               | Push when done                                                 |
 | `--skip-lockfile`      | Skip the `package-lock.json` refresh                           |
+| `--skip-patches`       | Do not apply `fork-patches/*.patch` (to redo a stale patch)    |
 | `--allow-dirty`        | Proceed with an unclean tree (last resort)                     |
 
 By default it takes the example app at the commit **the release tag pins**, which is the
@@ -133,23 +134,57 @@ preview deploy run before merging.
 
 ## Keeping a local change
 
-Everything outside the overlay is replaced on every sync. To make a change permanent, register
-its path in `FORK_OWNED_PATHS` in [`scripts/sync-upstream.mjs`](scripts/sync-upstream.mjs):
+Everything outside the overlay is replaced on every sync. There are two ways to keep a change.
+
+**A new file or directory**: register its path in `FORK_OWNED_PATHS` in
+[`scripts/sync-upstream.mjs`](scripts/sync-upstream.mjs). It is copied over the upstream tree
+untouched:
 
 ```js
-const FORK_OWNED_PATHS = ['scripts', 'DEPLOY.md', 'UPGRADING.md', '.github/workflows/block-deploy-to-main.yml'];
+const FORK_OWNED_PATHS = [
+  'scripts',
+  'DEPLOY.md',
+  'UPGRADING.md',
+  '.github/workflows/block-deploy-to-main.yml',
+  'fork-patches',
+  'apps/wfo-ui/policy',
+  'apps/wfo-ui/components/WfoGroupAuth',
+];
 ```
 
+**An edit to an upstream file**: keep it as a patch in `fork-patches/`. After the upstream tree
+and the fork-owned paths are laid down, the sync applies every `fork-patches/*.patch` in name
+order, exactly (no fuzz). Generate a patch against the upstream version of the files, e.g. the
+last sync commit:
+
+```bash
+git diff <last sync commit> -- apps/wfo-ui/pages/_app.tsx > fork-patches/0002-my-change.patch
+```
+
+Current patches:
+
+| Patch                         | What it does                                                                                                                                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0001-msp-group-policy.patch` | Cognito group policy: `cognito:groups` into the NextAuth session, `WfoGroupAuth` instead of `WfoAuth` in `_app.tsx`, Search menu item and page gated (code in `apps/wfo-ui/policy`, `components/WfoGroupAuth`) |
+
+**When a patch no longer applies**, the sync stops before it touches the branch and names the
+patch. Upstream changed the lines it touches:
+
+1. `npm run sync:upstream -- --skip-patches` (syncs, commits upstream without the fork's edits)
+2. Redo the change by hand, guided by the old patch, and check it builds
+3. Regenerate the patch: `git diff HEAD -- <files> > fork-patches/<name>.patch`
+4. Commit the edit and the new patch together
+
 For `package.json` specifically, add to `PACKAGE_JSON_OVERLAY` in the same file rather than
-editing `package.json` — the file itself comes from upstream each time.
+editing `package.json` or patching it — the file itself comes from upstream each time.
 
 Two rules that save pain later:
 
-- **Prefer new files over edits to upstream files.** A whole new path can be listed in
-  `FORK_OWNED_PATHS` and survives untouched. A modified upstream file cannot — it will be
-  overwritten, and the overlay has no way to express "upstream's version, but patched".
-- **Verify it survives.** After adding a path, run `node scripts/sync-upstream.mjs --dry-run`
-  and confirm the file is not listed as disappearing.
+- **Prefer new files over edits to upstream files.** A new path survives untouched; a patch can
+  go stale on every release. Keep patches to the few lines that wire fork code into upstream.
+- **Verify it survives.** After adding a path or a patch, run
+  `node scripts/sync-upstream.mjs --dry-run` and confirm nothing of yours is listed as
+  disappearing or differing.
 
 ## When things go wrong
 
