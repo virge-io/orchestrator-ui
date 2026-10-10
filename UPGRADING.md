@@ -2,7 +2,7 @@
 
 This is the runbook for pulling a new
 [orchestrator-ui-library](https://github.com/workfloworchestrator/orchestrator-ui-library)
-release into this fork. See [DEPLOY.md](DEPLOY.md) for *why* the repo is laid out the way it is.
+release into this fork. See [DEPLOY.md](DEPLOY.md) for _why_ the repo is laid out the way it is.
 
 This file is fork-owned and does not exist upstream, so editing it can never cause a merge
 conflict during a sync.
@@ -24,8 +24,8 @@ git push origin main
 upstream release fresh, then puts this fork's own files back on top. There is nothing to
 conflict, and the result is always exactly upstream plus a known, listed overlay.
 
-The trade-off: **any local edit to a path that is not fork-owned is silently discarded on the
-next sync.** See [Keeping a local change](#keeping-a-local-change).
+The trade-off: **any local edit to a path that is neither fork-owned nor kept as a patch in
+`fork-patches/` is silently discarded on the next sync.** See [Keeping a local change](#keeping-a-local-change).
 
 ---
 
@@ -54,7 +54,7 @@ git show '@orchestrator-ui/orchestrator-ui-components@9.0.0:version-compatibilit
 ```
 
 Each entry means "UI at this version or newer requires orchestrator-core at least this version".
-Confirm your backend meets it *before* you deploy.
+Confirm your backend meets it _before_ you deploy.
 
 **Upstream's own upgrade notes** — these exist only for releases with breaking changes:
 
@@ -92,22 +92,23 @@ npm run sync:upstream
 
 Requires a clean working tree. Useful flags:
 
-| Flag                    | Use                                                                 |
-| ----------------------- | ------------------------------------------------------------------- |
-| `--version X.Y.Z`       | Take a specific release instead of the newest                        |
-| `--tag <tag>`           | Take an exact tag                                                    |
-| `--branch <name>`       | Switch to that branch first                                          |
-| `--submodule-ref main`  | Take the example app's tip rather than the commit the tag pins       |
-| `--push`                | Push when done                                                       |
-| `--skip-lockfile`       | Skip the `package-lock.json` refresh                                 |
-| `--allow-dirty`         | Proceed with an unclean tree (last resort)                           |
+| Flag                   | Use                                                            |
+| ---------------------- | -------------------------------------------------------------- |
+| `--version X.Y.Z`      | Take a specific release instead of the newest                  |
+| `--tag <tag>`          | Take an exact tag                                              |
+| `--branch <name>`      | Switch to that branch first                                    |
+| `--submodule-ref main` | Take the example app's tip rather than the commit the tag pins |
+| `--push`               | Push when done                                                 |
+| `--skip-lockfile`      | Skip the `package-lock.json` refresh                           |
+| `--skip-patches`       | Do not apply `fork-patches/*.patch` (to redo a stale patch)    |
+| `--allow-dirty`        | Proceed with an unclean tree (last resort)                     |
 
 By default it takes the example app at the commit **the release tag pins**, which is the
 combination upstream tested. Use `--submodule-ref main` only when you specifically need the
 example app's newest commits.
 
-Re-running the script when nothing has changed is safe: it reports *"already matches upstream
-X.Y.Z; nothing to commit"* and leaves the tree clean.
+Re-running the script when nothing has changed is safe: it reports _"already matches upstream
+X.Y.Z; nothing to commit"_ and leaves the tree clean.
 
 ## Step 3 — Verify locally
 
@@ -133,23 +134,57 @@ preview deploy run before merging.
 
 ## Keeping a local change
 
-Everything outside the overlay is replaced on every sync. To make a change permanent, register
-its path in `FORK_OWNED_PATHS` in [`scripts/sync-upstream.mjs`](scripts/sync-upstream.mjs):
+Everything outside the overlay is replaced on every sync. There are two ways to keep a change.
+
+**A new file or directory**: register its path in `FORK_OWNED_PATHS` in
+[`scripts/sync-upstream.mjs`](scripts/sync-upstream.mjs). It is copied over the upstream tree
+untouched:
 
 ```js
-const FORK_OWNED_PATHS = ['scripts', 'DEPLOY.md', 'UPGRADING.md', '.github/workflows/block-deploy-to-main.yml'];
+const FORK_OWNED_PATHS = [
+  'scripts',
+  'DEPLOY.md',
+  'UPGRADING.md',
+  '.github/workflows/block-deploy-to-main.yml',
+  'fork-patches',
+  'apps/wfo-ui/policy',
+  'apps/wfo-ui/components/WfoGroupAuth',
+];
 ```
 
+**An edit to an upstream file**: keep it as a patch in `fork-patches/`. After the upstream tree
+and the fork-owned paths are laid down, the sync applies every `fork-patches/*.patch` in name
+order, exactly (no fuzz). Generate a patch against the upstream version of the files, e.g. the
+last sync commit:
+
+```bash
+git diff <last sync commit> -- apps/wfo-ui/pages/_app.tsx > fork-patches/0002-my-change.patch
+```
+
+Current patches:
+
+| Patch                         | What it does                                                                                                                                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0001-msp-group-policy.patch` | Cognito group policy: `cognito:groups` into the NextAuth session, `WfoGroupAuth` instead of `WfoAuth` in `_app.tsx`, Search menu item and page gated (code in `apps/wfo-ui/policy`, `components/WfoGroupAuth`) |
+
+**When a patch no longer applies**, the sync stops before it touches the branch and names the
+patch. Upstream changed the lines it touches:
+
+1. `npm run sync:upstream -- --skip-patches` (syncs, commits upstream without the fork's edits)
+2. Redo the change by hand, guided by the old patch, and check it builds
+3. Regenerate the patch: `git diff HEAD -- <files> > fork-patches/<name>.patch`
+4. Commit the edit and the new patch together
+
 For `package.json` specifically, add to `PACKAGE_JSON_OVERLAY` in the same file rather than
-editing `package.json` — the file itself comes from upstream each time.
+editing `package.json` or patching it — the file itself comes from upstream each time.
 
 Two rules that save pain later:
 
-- **Prefer new files over edits to upstream files.** A whole new path can be listed in
-  `FORK_OWNED_PATHS` and survives untouched. A modified upstream file cannot — it will be
-  overwritten, and the overlay has no way to express "upstream's version, but patched".
-- **Verify it survives.** After adding a path, run `node scripts/sync-upstream.mjs --dry-run`
-  and confirm the file is not listed as disappearing.
+- **Prefer new files over edits to upstream files.** A new path survives untouched; a patch can
+  go stale on every release. Keep patches to the few lines that wire fork code into upstream.
+- **Verify it survives.** After adding a path or a patch, run
+  `node scripts/sync-upstream.mjs --dry-run` and confirm nothing of yours is listed as
+  disappearing or differing.
 
 ## When things go wrong
 
@@ -178,9 +213,9 @@ a new filename and add that path to `FORK_OWNED_PATHS`. Details in [DEPLOY.md](D
 
 Checked when this fork moved from 7.6.0 to 8.9.2 — keep appending as you upgrade.
 
-| Release | What to watch for                                                                                                                                                   |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 7.7.0   | Requires **orchestrator-core ≥ 5.0.0**. Anything at or above this needs a Core 5 backend.                                                                            |
+| Release | What to watch for                                                                                                                                                     |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 7.7.0   | Requires **orchestrator-core ≥ 5.0.0**. Anything at or above this needs a Core 5 backend.                                                                             |
 | 8.0.0   | `pydantic-forms` 1.x → 2.x. Custom form components reading `useGetConfig()` must use `componentMatcher` instead of `componentMatcherExtender`.                        |
 | 8.4.0   | Agent/CopilotKit feature **removed** (`WfoAgent`, `pages/agent.tsx`, `pages/api/copilotkit.ts`, the `@copilotkit/*` and `@elastic/charts` deps). No longer available. |
 

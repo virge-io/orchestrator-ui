@@ -10,7 +10,8 @@
  * materialized as ordinary tracked files.
  *
  * The fork's own files (see FORK_OWNED_PATHS and PACKAGE_JSON_OVERLAY) are carried
- * across every sync, so this script can regenerate the branch it lives on.
+ * across every sync, so this script can regenerate the branch it lives on. Edits to
+ * upstream files are kept as patches in FORK_PATCHES_DIR and re-applied on top.
  *
  * Usage: node scripts/sync-upstream.mjs [options]   (or: npm run sync:upstream)
  */
@@ -42,7 +43,23 @@ const FALLBACK_SUBMODULE_URL = 'https://github.com/workfloworchestrator/example-
  * Paths owned by this fork. They are taken from the current branch and re-applied
  * after the upstream tree is laid down, so they survive every sync.
  */
-const FORK_OWNED_PATHS = ['scripts', 'DEPLOY.md', 'UPGRADING.md', '.github/workflows/block-deploy-to-main.yml'];
+const FORK_OWNED_PATHS = [
+  'scripts',
+  'DEPLOY.md',
+  'UPGRADING.md',
+  '.github/workflows/block-deploy-to-main.yml',
+  'fork-patches',
+  // Cognito group policy (admins / shopvirge-msp); wired into upstream files by fork-patches/.
+  'apps/wfo-ui/policy',
+  'apps/wfo-ui/components/WfoGroupAuth',
+];
+
+/**
+ * Edits to upstream files, as `git diff` patches against the upstream version. After the
+ * upstream tree and the fork-owned paths are laid down, every *.patch in this directory is
+ * applied in name order. A patch that no longer applies stops the sync (see UPGRADING.md).
+ */
+const FORK_PATCHES_DIR = 'fork-patches';
 
 /**
  * Merged into the upstream package.json after each sync.
@@ -87,6 +104,7 @@ function parseCliArgs(argv) {
     push: false,
     dryRun: false,
     skipLockfile: false,
+    skipPatches: false,
     allowDirty: false,
   };
 
@@ -125,6 +143,9 @@ function parseCliArgs(argv) {
       case '--skip-lockfile':
         options.skipLockfile = true;
         break;
+      case '--skip-patches':
+        options.skipPatches = true;
+        break;
       case '--allow-dirty':
         options.allowDirty = true;
         break;
@@ -144,6 +165,7 @@ Options:
   --push              Push the branch to origin when done
   --dry-run           Report what would change, then restore the branch untouched
   --skip-lockfile     Do not run "npm install --package-lock-only" afterwards
+  --skip-patches      Do not apply ${FORK_PATCHES_DIR}/*.patch (to redo a patch that no longer applies)
   --allow-dirty       Proceed even though the working tree is not clean
   -h, --help          Show this message`);
         process.exit(0);
@@ -387,6 +409,38 @@ function copyForkOwnedPaths(fromDir, toDir) {
   return copied;
 }
 
+/**
+ * Applies the fork's patches to the generated tree. The tree is no git repository, so
+ * `git apply` works as a plain, exact patch tool here: no fuzz, all-or-nothing per patch.
+ */
+function applyForkPatches(treeDir) {
+  const patchesDir = path.join(treeDir, FORK_PATCHES_DIR);
+
+  if (!existsSync(patchesDir)) {
+    return [];
+  }
+
+  const patches = readdirSync(patchesDir)
+    .filter((name) => name.endsWith('.patch'))
+    .sort();
+
+  for (const name of patches) {
+    const patchPath = path.join(patchesDir, name);
+    const check = run('git', ['apply', '--check', patchPath], { capture: true, allowFailure: true, cwd: treeDir });
+
+    if (check.status !== 0) {
+      throw new Error(
+        `${FORK_PATCHES_DIR}/${name} no longer applies to this upstream release:\n${check.stderr}\n`
+          + 'Sync with --skip-patches, redo the change by hand and regenerate the patch (UPGRADING.md, "Keeping a local change").',
+      );
+    }
+
+    run('git', ['apply', patchPath], { cwd: treeDir });
+  }
+
+  return patches;
+}
+
 function sortObjectKeys(object) {
   return Object.fromEntries(Object.entries(object).sort(([left], [right]) => left.localeCompare(right)));
 }
@@ -498,6 +552,14 @@ function main() {
     const restored = copyForkOwnedPaths(repoDir, treeDir);
     console.log(restored.length ? `    ${restored.join('\n    ')}` : '    (none found on this branch)');
     applyPackageJsonOverlay(treeDir);
+
+    if (options.skipPatches) {
+      logStep(`Skipping ${FORK_PATCHES_DIR} (--skip-patches): redo them by hand before committing`);
+    } else {
+      logStep(`Applying ${FORK_PATCHES_DIR}`);
+      const applied = applyForkPatches(treeDir);
+      console.log(applied.length ? `    ${applied.join('\n    ')}` : '    (none)');
+    }
 
     if (options.dryRun) {
       logStep('Dry run: comparing the generated tree against the current branch');
